@@ -1,0 +1,21 @@
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# production
+/dist
+/public
+.env
+.DS_Store
+*.local
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvsps
+*.njsproj
+*.sln
+*.bak

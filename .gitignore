@@ -6,7 +6,6 @@
 
 # production
 /dist
-/public
 .env
 .DS_Store
 *.local

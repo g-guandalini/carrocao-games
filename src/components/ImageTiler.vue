@@ -11,17 +11,26 @@
   </template>
   
   <script lang="ts">
-  import { defineComponent, ref, watch, computed } from 'vue';
+ import { defineComponent, ref, watch, computed, type StyleValue, type CSSProperties } from 'vue';
+
   
   // Interface para representar cada ladrilho da imagem
-  interface Tile {
-    id: number;
-    originalGridPos: { row: number; col: number }; // Posição na grade original (para background-position)
-    bgPosition: { x: number; y: number }; // Posição em pixels para CSS background-position
-    initialDisplayPos: { x: number; y: number }; // Posição visual inicial embaralhada
-    currentDisplayPos: { x: number; y: number }; // Posição visual atual (onde o tile é desenhado)
-    revealOrderIndex: number; // Índice na ordem aleatória de revelação
-  }
+  interface TileConfig {
+  id: number;
+  originalGridPos: { row: number; col: number };
+  bgPosition: { x: number; y: number };
+  initialDisplayPos: { x: number; y: number }; // Posição visual inicial embaralhada
+  revealOrderIndex: number; // Índice na ordem aleatória de revelação
+}
+
+// Interface para representar o ladrilho como ele é renderizado no VUE
+interface DisplayTile {
+  id: number;
+  originalGridPos: { row: number; col: number };
+  bgPosition: { x: number; y: number };
+  currentDisplayPos: { x: number; y: number }; // Posição visual atual (onde o tile é desenhado)
+  isCorrectlyPlaced: boolean; // Indicador se o tile está na posição correta
+}
   
   export default defineComponent({
     name: 'ImageTiler',
@@ -48,8 +57,8 @@
       },
     },
     setup(props) {
-      const tiles = ref<Tile[]>([]); // Estado reativo dos tiles
-      const initialTileData = ref<Omit<Tile, 'currentDisplayPos'>[]>([]); // Dados base dos tiles para re-cálculo
+      const tiles = ref<DisplayTile[]>([]); // Estado reativo dos tiles
+      const initialTileData = ref<Omit<TileConfig, 'currentDisplayPos'>[]>([]); // Dados base dos tiles para re-cálculo
   
       const totalTiles = computed(() => props.gridSize * props.gridSize);
       const tileWidth = computed(() => props.imageWidth / props.gridSize);
@@ -118,23 +127,21 @@
   
       // Função para atualizar o estado visual dos tiles com base no progresso de revelação
       const updateTilesVisualState = (progress: number) => {
-        const numTilesCorrectlyPlaced = Math.floor(progress * totalTiles.value);
-  
-        tiles.value = initialTileData.value.map(initialData => {
-          // Um tile é considerado "correto" se seu índice na ordem de revelação
-          // for menor que o número de tiles que devem estar corretos no momento.
-          const isCorrect = initialData.revealOrderIndex < numTilesCorrectlyPlaced;
-          return {
-            id: initialData.id,
-            originalGridPos: initialData.originalGridPos,
-            bgPosition: initialData.bgPosition,
-            currentDisplayPos: isCorrect
-              ? { x: initialData.originalGridPos.col * tileWidth.value, y: initialData.originalGridPos.row * tileHeight.value } // Posição correta
-              : initialData.initialDisplayPos, // Posição embaralhada
-            isCorrectlyPlaced: isCorrect, // Indicador, não usado diretamente no estilo mas útil para depuração
-          };
-        });
-      };
+      const numTilesCorrectlyPlaced = Math.floor(progress * totalTiles.value);
+
+      tiles.value = initialTileData.value.map(initialData => {
+        const isCorrect = initialData.revealOrderIndex < numTilesCorrectlyPlaced;
+        return {
+          id: initialData.id,
+          originalGridPos: initialData.originalGridPos,
+          bgPosition: initialData.bgPosition,
+          currentDisplayPos: isCorrect
+            ? { x: initialData.originalGridPos.col * tileWidth.value, y: initialData.originalGridPos.row * tileHeight.value }
+            : initialData.initialDisplayPos,
+          isCorrectlyPlaced: isCorrect,
+        } satisfies DisplayTile; // Adiciona 'satisfies DisplayTile' para garantir que o objeto está em conformidade
+      });
+    };
   
       // Observa mudanças na URL da imagem para re-inicializar os tiles
       watch(() => props.imageUrl, initializeTiles, { immediate: true });
@@ -146,21 +153,20 @@
       watch(() => [props.gridSize, props.imageWidth, props.imageHeight], initializeTiles);
   
       // Gera o estilo CSS para cada tile
-      const getTileStyle = (tile: Tile) => ({
+      const getTileStyle = (tile: DisplayTile): CSSProperties => ({ // Agora espera DisplayTile e retorna CSSProperties
         width: `${tileWidth.value}px`,
         height: `${tileHeight.value}px`,
         backgroundImage: `url(${props.imageUrl})`,
         backgroundPosition: `${tile.bgPosition.x}px ${tile.bgPosition.y}px`,
-        // background-size deve ser o tamanho total da imagem, para que cada tile mostre apenas sua parte
         backgroundSize: `${props.imageWidth}px ${props.imageHeight}px`,
         transform: `translate(${tile.currentDisplayPos.x}px, ${tile.currentDisplayPos.y}px)`,
-        transition: 'transform 0.5s ease-out', // Transição suave para o movimento dos tiles
-        position: 'absolute', // Permite o posicionamento absoluto dentro do container
-        zIndex: tile.isCorrectlyPlaced ? 1 : 0, // Tiles corretos podem ter z-index maior para visibilidade
+        transition: 'transform 0.5s ease-out',
+        position: 'absolute', // Com CSSProperties, 'absolute' é aceito corretamente
+        zIndex: tile.isCorrectlyPlaced ? 1 : 0, // Agora 'isCorrectlyPlaced' existe em DisplayTile
       });
   
       // Estilo para o container principal que mantém os tiles
-      const containerStyle = computed(() => ({
+      const containerStyle = computed<StyleValue>(() => ({
         width: `${props.imageWidth}px`,
         height: `${props.imageHeight}px`,
         position: 'relative', // Necessário para o posicionamento absoluto dos tiles

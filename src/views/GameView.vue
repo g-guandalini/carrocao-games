@@ -1,137 +1,133 @@
 <template>
-    <div class="game-container">
-      <h1>Adivinhe o Personagem!</h1>
-  
-      <div v-if="gameStore.gameStatus === 'idle'">
-        <p class="instruction-text">Pressione "Iniciar Jogo" para começar uma nova rodada e ver a imagem começar a se revelar.</p>
-        <button class="action-button primary" @click="startNewRound">Iniciar Jogo</button>
-      </div>
-  
-      <div v-if="gameStore.gameStatus !== 'idle'">
-        <div class="image-display">
-            <ImageTiler
-            :image-url="gameStore.currentRoundCharacter?.imageUrl || ''"
-            :reveal-progress="gameStore.revealProgress"
-            :grid-size="15"
-            :image-width="500"
-            :image-height="350"
-          />
-        </div>
-  
-        <p class="timer-info" v-if="gameStore.gameStatus === 'revealing'">
-          A imagem está revelando... **{{ (gameStore.revealProgress * 100).toFixed(0) }}%**
-        </p>
-        <p class="timer-info" v-if="gameStore.gameStatus === 'guessing' && gameStore.activeTeam">
-          **{{ gameStore.activeTeam }}** é a vez de palpitar! ⏳
-        </p>
-        <p class="timer-info" v-if="gameStore.gameStatus === 'finished'">
-          Rodada finalizada! Era: **{{ gameStore.currentRoundCharacter?.name }}**
-        </p>
-  
-  
-        <div class="team-buttons">
-          <TeamButton
-            v-for="color in Object.values(TeamColor)"
-            :key="color"
-            :team-color="color"
-            :team-name="`Equipe ${color}`"
-            :disabled="gameStore.gameStatus !== 'revealing'"
-            @select-team="handleTeamSelect"
-          />
-        </div>
-  
-        <GuessModal
-          :show="gameStore.gameStatus === 'guessing'"
-          :active-team="gameStore.activeTeam"
-          @submit-guess="handleGuessSubmit"
-          @close="handleGuessModalClose"
+  <div class="game-container">
+    <h1>Adivinhe o Personagem!</h1>
+
+    <div v-if="gameStore.gameStatus === 'idle'">
+      <p class="instruction-text">Pressione "Iniciar Jogo" para começar uma nova rodada e ver a imagem começar a se revelar.</p>
+      <button class="action-button primary" @click="startNewRound">Iniciar Jogo</button>
+    </div>
+
+    <div v-if="gameStore.gameStatus !== 'idle'">
+      <div class="image-display">
+          <ImageTiler
+          :image-url="gameStore.currentRoundCharacter?.imageUrl || ''"
+          :reveal-progress="gameStore.revealProgress"
+          :grid-size="15"
+          :image-width="500"
+          :image-height="350"
         />
-  
-        <div class="score-board">
-          <h2>Placar Atual 🏆</h2>
-          <ul>
-            <li v-for="(score, team) in gameStore.score" :key="team">
-              <span :style="{ color: getTeamColorHex(team) }">{{ team }}</span>: {{ score }} pontos
-            </li>
-          </ul>
-        </div>
-  
-        <div class="game-actions">
-          <button
-            v-if="gameStore.gameStatus === 'finished'"
-            @click="startNewRound"
-            class="action-button primary"
-          >
-            Próxima Rodada ➡️
-          </button>
-          <button
-            v-if="gameStore.gameStatus === 'finished' || gameStore.gameStatus === 'idle'"
-            @click="resetGameScores"
-            class="action-button secondary"
-          >
-            Reiniciar Jogo (Zerar Placar) ↩️
-          </button>
-        </div>
+      </div>
+
+      <p class="timer-info" v-if="gameStore.gameStatus === 'revealing'">
+        A imagem está revelando... **{{ (gameStore.revealProgress * 100).toFixed(0) }}%**
+      </p>
+      <p class="timer-info" v-if="gameStore.gameStatus === 'guessing' && gameStore.activeTeam">
+        **{{ gameStore.activeTeam }}** é a vez de palpitar! ⏳
+      </p>
+      <p class="timer-info" v-if="gameStore.gameStatus === 'finished'">
+        Rodada finalizada! Era: **{{ gameStore.currentRoundCharacter?.name }}**
+      </p>
+
+      <div class="team-buttons">
+        <TeamButton
+          v-for="color in Object.values(TeamColor)"
+          :key="color"
+          :team-color="color"
+          :team-name="`Equipe ${color}`"
+          :disabled="gameStore.gameStatus !== 'revealing'"
+          @select-team="handleTeamSelect"
+        />
+      </div>
+
+      <GuessModal
+        :show="gameStore.gameStatus === 'guessing'"
+        :active-team="gameStore.activeTeam"
+        @submit-guess="handleGuessSubmit"
+        @close="handleGuessModalClose"
+      />
+
+      <div class="score-board">
+        <h2>Placar Atual 🏆</h2>
+        <ul>
+          <li v-for="(score, team) in gameStore.score" :key="team">
+            <span :style="{ color: getTeamColorHex(team) }">{{ team }}</span>: {{ score }} pontos
+          </li>
+        </ul>
       </div>
     </div>
-  </template>
-  
-  <script lang="ts">
-  import { defineComponent, computed } from 'vue';
-  import { gameStore, startNewRound, selectTeam, submitGuess, stopReveal, resetGameScores } from '../store/gameStore';
-  import { TeamColor } from '../types';
-  import TeamButton from '../components/TeamButton.vue';
-  import GuessModal from '../components/GuessModal.vue';
-  import ImageTiler from '../components/ImageTiler.vue'; // Importa o novo componente
-  
-  export default defineComponent({
-    name: 'GameView',
-    components: {
-      TeamButton,
-      GuessModal,
-      ImageTiler, // Registra o novo componente
-    },
-    setup() {
-      // blurAmount não é mais necessário
-  
-      const handleTeamSelect = (team: TeamColor) => {
-        selectTeam(team);
-      };
-  
-      const handleGuessSubmit = (guess: string) => {
-        submitGuess(guess);
-      };
-  
-      const handleGuessModalClose = () => {
-        // Se o usuário cancelar o palpite, a rodada é finalizada
-        stopReveal(); // Garante que o intervalo de revelação seja limpo
-        gameStore.gameStatus = 'finished';
-        alert('Palpite cancelado. A rodada foi finalizada sem um palpite.');
-      };
-  
-      const getTeamColorHex = (team: string) => {
-        switch (team) {
-          case TeamColor.BLUE: return '#3498db';
-          case TeamColor.RED: return '#e74c3c';
-          case TeamColor.GREEN: return '#2ecc71';
-          case TeamColor.YELLOW: return '#f1c40f';
-          default: return '#333';
-        }
-      };
-  
-      return {
-        gameStore,
-        TeamColor,
-        startNewRound,
-        resetGameScores,
-        handleTeamSelect,
-        handleGuessSubmit,
-        handleGuessModalClose,
-        getTeamColorHex,
-      };
-    },
-  });
-  </script>
+    <!-- MOVEMOS game-actions PARA FORA do v-if="gameStore.gameStatus !== 'idle'" -->
+    <div class="game-actions">
+      <button
+        v-if="gameStore.gameStatus === 'finished'"
+        @click="startNewRound"
+        class="action-button primary"
+      >
+        Próxima Rodada ➡️
+      </button>
+      <button
+        v-if="gameStore.gameStatus === 'finished'"
+        @click="resetGameScores"
+        class="action-button secondary"
+      >
+        Reiniciar Jogo (Zerar Placar) ↩️
+      </button>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent } from 'vue'; // Removido 'computed' para resolver o TS6133
+import { gameStore, startNewRound, selectTeam, submitGuess, stopReveal, resetGameScores } from '../store/gameStore';
+import { TeamColor } from '../types';
+import TeamButton from '../components/TeamButton.vue';
+import GuessModal from '../components/GuessModal.vue';
+import ImageTiler from '../components/ImageTiler.vue';
+
+export default defineComponent({
+  name: 'GameView',
+  components: {
+    TeamButton,
+    GuessModal,
+    ImageTiler,
+  },
+  setup() {
+    const handleTeamSelect = (team: TeamColor) => {
+      selectTeam(team);
+    };
+
+    const handleGuessSubmit = (guess: string) => {
+      submitGuess(guess);
+    };
+
+    const handleGuessModalClose = () => {
+      stopReveal();
+      gameStore.gameStatus = 'finished';
+      alert('Palpite cancelado. A rodada foi finalizada sem um palpite.');
+    };
+
+    const getTeamColorHex = (team: string) => {
+      switch (team) {
+        case TeamColor.BLUE: return '#3498db';
+        case TeamColor.RED: return '#e74c3c';
+        case TeamColor.GREEN: return '#2ecc71';
+        case TeamColor.YELLOW: return '#f1c40f';
+        default: return '#333';
+      }
+    };
+
+    return {
+      gameStore,
+      TeamColor,
+      startNewRound,
+      resetGameScores,
+      handleTeamSelect,
+      handleGuessSubmit,
+      handleGuessModalClose,
+      getTeamColorHex,
+    };
+  },
+});
+</script>
   
   <style scoped>
   .game-container {

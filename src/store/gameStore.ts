@@ -3,14 +3,14 @@ import { GameState, TeamColor, Character } from '../types';
 
 // Lista de personagens para o jogo
 const ALL_CHARACTERS: Character[] = [
-  { id: '1', name: 'Mickey Mouse', imageUrl: '/src/assets/characters/mickey.png' },
-  { id: '2', name: 'Homem Aranha', imageUrl: '/src/assets/characters/homem_aranha.png' },
-  { id: '3', name: 'Pikachu', imageUrl: '/src/assets/characters/pikachu.png' },
-  { id: '4', name: 'Goku', imageUrl: '/src/assets/characters/goku.png' },
-  { id: '5', name: 'Homem de Ferro', imageUrl: '/src/assets/characters/homem_ferro.png' },
-  { id: '6', name: 'Batman', imageUrl: '/src/assets/characters/batman.png' },
-  { id: '7', name: 'Capitão America', imageUrl: '/src/assets/characters/capitao_america.png' },
-  { id: '8', name: 'Mulher Maravilha', imageUrl: '/src/assets/characters/mulher_maravilha.png' },
+  { id: '1', name: 'Mickey Mouse', imageUrl: '/characters/mickey.png' },
+  { id: '2', name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png' },
+  { id: '3', name: 'Pikachu', imageUrl: '/characters/pikachu.png' },
+  { id: '4', name: 'Goku', imageUrl: '/characters/goku.png' },
+  { id: '5', name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png' },
+  { id: '6', name: 'Batman', imageUrl: '/characters/batman.png' },
+  { id: '7', name: 'Capitão America', imageUrl: '/characters/capitao_america.png' },
+  { id: '8', name: 'Mulher Maravilha', imageUrl: '/characters/mulher_maravilha.png' },
 ];
 
 // Estado inicial para uma rodada (sem resetar o placar)

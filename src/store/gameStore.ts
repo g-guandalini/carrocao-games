@@ -2,7 +2,7 @@
 import { reactive } from 'vue';
 import { GameState, TeamColor, Character, GameStatus } from '../types';
 // IMPORTANTE: Importe o 'addToast' como uma exportação nomeada separada!
-import { toastStore, addToast } from './toastStore'; 
+import { addToast } from './toastStore'; 
 
 // Lista de personagens para o jogo (com as novas dicas)
 const ALL_CHARACTERS: Character[] = [
@@ -48,7 +48,7 @@ const REVEAL_STEP_MS = 100; // Atualiza a cada 100ms
 function pickRandomCharacter(): Character {
   const availableCharacters = gameStore.characters.filter(char => char.id !== gameStore.currentRoundCharacter?.id);
   if (availableCharacters.length === 0) {
-      toastStore.addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
+      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
       // Precisa usar 'addToast' diretamente aqui, não 'toastStore.addToast'
       // Corrigido:
       addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');

@@ -9,14 +9,15 @@
     </div>
 
     <!-- Exibição da Imagem (visível em todas as fases, exceto 'hint') -->
-    <div v-show="gameStatus !== 'hint'" class="image-display">
+    <!-- Adicionamos uma ref para capturar a largura do elemento -->
+    <div v-show="gameStatus !== 'hint'" class="image-display" ref="imageDisplayRef">
       <ImageTiler
         :key="currentRoundCharacter?.id"
         :image-url="currentRoundCharacter?.imageUrl || ''"
         :reveal-progress="revealProgress"
         :grid-size="10"
-        :image-width="500"
-        :image-height="350"
+        :image-width="calculatedImageWidth.value"
+        :image-height="calculatedImageHeight.value" 
       />
     </div>
 
@@ -63,13 +64,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType } from 'vue';
+import { defineComponent, ref, onMounted, onUnmounted, PropType } from 'vue'; // Importe ref, onMounted, onUnmounted
 import ImageTiler from './ImageTiler.vue';
 import TeamButton from './TeamButton.vue';
 import GuessModal from './GuessModal.vue';
-import ToastNotification from './ToastNotification.vue'; // NOVO: Importe o componente de toast
+import ToastNotification from './ToastNotification.vue';
 import { Character, GameStatus, TeamColor } from '../types';
-import { proceedToReveal, selectTeam, submitGuess } from '../store/gameStore'; // Importe as funções do gameStore
+import { proceedToReveal, selectTeam, submitGuess } from '../store/gameStore';
 
 export default defineComponent({
   name: 'GameImagemOculta',
@@ -77,7 +78,7 @@ export default defineComponent({
     ImageTiler,
     TeamButton,
     GuessModal,
-    ToastNotification, // NOVO: Adicione aos componentes
+    ToastNotification,
   },
   props: {
     currentRoundCharacter: {
@@ -101,22 +102,48 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['select-team', 'submit-guess', 'close-guess-modal'], // Esses emits agora chamarão as funções do gameStore
+  emits: ['select-team', 'submit-guess', 'close-guess-modal'],
 
   setup(_props, { emit }) {
-    // Função para chamar o selectTeam do gameStore
+    // --- NOVO: Lógica de responsividade da imagem ---
+    const imageDisplayRef = ref<HTMLElement | null>(null);
+    const calculatedImageWidth = ref(500); // Valor inicial
+    const calculatedImageHeight = ref(350); // Valor inicial
+    const originalAspectRatio = 500 / 350; // Aspect ratio da imagem original
+
+    const updateImageDimensions = () => {
+      if (imageDisplayRef.value) {
+        let newWidth = imageDisplayRef.value.offsetWidth;
+        // Limita a largura ao tamanho original máximo de 500px para desktop
+        if (newWidth > 500) {
+          newWidth = 500;
+        }
+        calculatedImageWidth.value = newWidth;
+        calculatedImageHeight.value = newWidth / originalAspectRatio;
+      }
+    };
+
+    onMounted(() => {
+      updateImageDimensions(); // Calcula as dimensões no carregamento inicial
+      window.addEventListener('resize', updateImageDimensions); // Recalcula ao redimensionar a janela
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener('resize', updateImageDimensions); // Remove o listener ao destruir o componente
+    });
+    // --- FIM: Lógica de responsividade da imagem ---
+
+
     const selectTeamFromStore = (team: TeamColor) => {
       selectTeam(team);
-      emit('select-team', team); // Mantém o emit para compatibilidade caso o pai esteja ouvindo
+      emit('select-team', team);
     };
 
-    // Função para chamar o submitGuess do gameStore
     const submitGuessFromStore = (guessText: string) => {
       submitGuess(guessText);
-      emit('submit-guess', guessText); // Mantém o emit para compatibilidade caso o pai esteja ouvindo
+      emit('submit-guess', guessText);
     };
 
-    // Função para obter a cor hexadecimal da equipe para exibição no placar
     const getTeamColorHex = (team: TeamColor) => {
       switch (team) {
         case TeamColor.BLUE: return '#3498db';
@@ -130,9 +157,14 @@ export default defineComponent({
     return {
       TeamColor,
       getTeamColorHex,
-      proceedToReveal, // Exponha a função para o template
-      selectTeamFromStore, // Use esta função no template para os botões das equipes
-      submitGuessFromStore, // Use esta função no template para o GuessModal
+      proceedToReveal,
+      selectTeamFromStore,
+      submitGuessFromStore,
+      // --- NOVO: Expor as refs e valores calculados para o template ---
+      imageDisplayRef,
+      calculatedImageWidth,
+      calculatedImageHeight,
+      // --- FIM ---
     };
   },
 });
@@ -143,25 +175,27 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
+  width: 100%; /* Garante que ocupe 100% da largura do pai */
   max-width: 800px;
-  padding-top: 20px; /* Espaço para o cabeçalho fixo */
+  padding-top: 20px;
 }
 
-/* NOVO: Estilos para a seção da Dica */
 .hint-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 350px; /* Mantém a altura similar à área da imagem para consistência */
-  width: 500px; /* Mantém a largura similar à área da imagem */
-  background-color: #f8f8f8; /* Um fundo suave para a caixa da dica */
+  /* min-height: 350px; <-- REMOVIDO OU AJUSTADO para ser responsivo */
+  min-height: 200px; /* Min-height menor para mobile, ou ajuste conforme o conteúdo */
+  width: 100%; /* Ocupa 100% da largura disponível */
+  max-width: 500px; /* Limita a largura em telas maiores */
+  background-color: #f8f8f8;
   border-radius: 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 25px;
   padding: 20px;
   text-align: center;
+  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura total */
 }
 
 .hint-text {
@@ -172,7 +206,7 @@ export default defineComponent({
 }
 
 .proceed-button {
-  background-color: #2ecc71; /* Cor primária, similar ao botão de iniciar */
+  background-color: #2ecc71;
   color: white;
   padding: 15px 30px;
   border: none;
@@ -189,10 +223,10 @@ export default defineComponent({
   box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
 }
 
-/* Estilos existentes */
 .image-display {
-  width: 500px;
-  height: 350px;
+  width: 100%; /* Ocupa 100% da largura disponível */
+  /* height: 350px; <-- REMOVIDO, a altura será definida pelo ImageTiler dinamicamente */
+  max-width: 500px; /* Limita a largura em telas maiores */
   background-color: #ecf0f1;
   display: flex;
   justify-content: center;
@@ -200,6 +234,8 @@ export default defineComponent({
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 25px;
+  min-height: 200px; /* Adiciona um min-height para evitar colapso em mobile */
+  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura total */
 }
 
 .timer-info {
@@ -230,6 +266,7 @@ export default defineComponent({
   max-width: 450px;
   text-align: left;
   border: 1px solid #eee;
+  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura total */
 }
 
 .score-board h2 {
@@ -255,5 +292,31 @@ export default defineComponent({
 
 .score-board li:last-child {
   border-bottom: none;
+}
+
+/* Ajustes para telas menores (mobile) */
+@media (max-width: 600px) {
+  .hint-text {
+    font-size: 1.5em; /* Fonte menor para a dica em mobile */
+  }
+  .timer-info {
+    font-size: 1.1em; /* Fonte menor para info do timer */
+  }
+  .proceed-button {
+    padding: 12px 25px;
+    font-size: 1.1em;
+  }
+  .team-buttons {
+    gap: 10px; /* Espaçamento menor entre botões */
+  }
+  .score-board {
+    padding: 15px; /* Padding menor no placar */
+  }
+  .score-board h2 {
+    font-size: 1.5em;
+  }
+  .score-board li {
+    font-size: 1.1em;
+  }
 }
 </style>

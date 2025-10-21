@@ -1,7 +1,7 @@
 // stores/gameStore.ts
 import { reactive } from 'vue';
 import { GameState, TeamColor, Character, GameStatus } from '../types';
-import { toastStore, addToast } from './toastStore'; // <-- Importação CORRETA
+import { addToast } from './toastStore'; // <-- Importação CORRETA
 
 // Lista de personagens para o jogo (com as novas dicas)
 const ALL_CHARACTERS: Character[] = [

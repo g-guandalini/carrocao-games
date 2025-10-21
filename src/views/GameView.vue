@@ -4,8 +4,6 @@
     <SplashScreen
       v-if="gameStore.gameStatus === ('idle' as GameStatus)"
       @start-game="startNewRound"
-      @select-connection="handleConexaoClick"
-      @select-bug="handleBugClick"
     />
 
     <!-- Se o jogo NÃO está 'idle', mostra o resto da interface do jogo -->

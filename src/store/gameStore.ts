@@ -1,8 +1,7 @@
 // stores/gameStore.ts
 import { reactive } from 'vue';
 import { GameState, TeamColor, Character, GameStatus } from '../types';
-// IMPORTANTE: Importe o 'addToast' como uma exportação nomeada separada!
-import { addToast } from './toastStore'; 
+import { toastStore, addToast } from './toastStore'; // <-- Importação CORRETA
 
 // Lista de personagens para o jogo (com as novas dicas)
 const ALL_CHARACTERS: Character[] = [
@@ -20,7 +19,7 @@ const ALL_CHARACTERS: Character[] = [
 const initialRoundState = () => ({
   currentRoundCharacter: null as Character | null,
   revealProgress: 0,
-  gameStatus: 'idle' as GameStatus, 
+  gameStatus: 'idle' as GameStatus, // <-- Especificado o tipo para GameStatus
   activeTeam: null as TeamColor | null,
   guess: '',
 });
@@ -41,17 +40,14 @@ const initialState: GameState = {
 export const gameStore = reactive<GameState>({ ...initialState });
 
 let revealInterval: number | null = null;
-const REVEAL_DURATION_MS = 30000; // 30 segundos para revelar completamente
-const REVEAL_STEP_MS = 100; // Atualiza a cada 100ms
+const REVEAL_DURATION_MS = 30000;
+const REVEAL_STEP_MS = 100;
 
 // Função auxiliar para selecionar um personagem aleatório
 function pickRandomCharacter(): Character {
   const availableCharacters = gameStore.characters.filter(char => char.id !== gameStore.currentRoundCharacter?.id);
   if (availableCharacters.length === 0) {
-      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
-      // Precisa usar 'addToast' diretamente aqui, não 'toastStore.addToast'
-      // Corrigido:
-      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
+      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info'); // <-- USO CORRETO
       return gameStore.characters[Math.floor(Math.random() * gameStore.characters.length)];
   }
   return availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
@@ -59,30 +55,28 @@ function pickRandomCharacter(): Character {
 
 // Inicia uma nova rodada, começando pela fase de dica
 export function startNewRound() {
-  stopReveal(); 
+  stopReveal();
 
   Object.assign(gameStore, initialRoundState());
 
   gameStore.currentRoundCharacter = pickRandomCharacter();
-  gameStore.gameStatus = 'hint'; 
+  gameStore.gameStatus = 'hint';
 }
 
 // Prossegue da fase de dica para a fase de revelação da imagem
 export function proceedToReveal() {
   if (!gameStore.currentRoundCharacter) {
-    // Corrigido:
-    addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error');
+    addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error'); // <-- USO CORRETO
     return;
   }
   gameStore.gameStatus = 'revealing';
   revealInterval = setInterval(() => {
     gameStore.revealProgress += REVEAL_STEP_MS / REVEAL_DURATION_MS;
     if (gameStore.revealProgress >= 1) {
-      gameStore.revealProgress = 1; 
+      gameStore.revealProgress = 1;
       stopReveal();
-      gameStore.gameStatus = 'finished'; 
-      // Corrigido:
-      addToast(`Tempo esgotado! A imagem completa era: <strong>${gameStore.currentRoundCharacter?.name}</strong>`, 'info');
+      gameStore.gameStatus = 'finished';
+      addToast(`Tempo esgotado! A imagem completa era: <strong>${gameStore.currentRoundCharacter?.name}</strong>`, 'info'); // <-- USO CORRETO
     }
   }, REVEAL_STEP_MS) as unknown as number;
 }
@@ -99,9 +93,9 @@ export function stopReveal() {
 // Seleciona uma equipe quando um botão é pressionado
 export function selectTeam(team: TeamColor) {
   if (gameStore.gameStatus === 'revealing') {
-    stopReveal(); 
+    stopReveal();
     gameStore.activeTeam = team;
-    gameStore.gameStatus = 'guessing'; 
+    gameStore.gameStatus = 'guessing';
   }
 }
 
@@ -113,20 +107,18 @@ export function submitGuess(guessText: string) {
 
     if (isCorrect) {
       gameStore.score[gameStore.activeTeam]++;
-      // Corrigido:
-      addToast(`🎉 Equipe <strong>${gameStore.activeTeam}</strong> acertou! Placar: <strong>${gameStore.activeTeam}</strong> - <strong>${gameStore.score[gameStore.activeTeam]}</strong> pontos.`, 'success');
+      addToast(`🎉 Equipe <strong>${gameStore.activeTeam}</strong> acertou! Placar: <strong>${gameStore.activeTeam}</strong> - <strong>${gameStore.score[gameStore.activeTeam]}</strong> pontos.`, 'success'); // <-- USO CORRETO
     } else {
-      // Corrigido:
-      addToast(`❌ Equipe <strong>${gameStore.activeTeam}</strong> errou! A resposta correta era: <strong>${gameStore.currentRoundCharacter.name}</strong>.`, 'error');
+      addToast(`❌ Equipe <strong>${gameStore.activeTeam}</strong> errou! A resposta correta era: <strong>${gameStore.currentRoundCharacter.name}</strong>.`, 'error'); // <-- USO CORRETO
     }
-    gameStore.gameStatus = 'finished'; 
+    gameStore.gameStatus = 'finished';
   }
 }
 
 // Reseta apenas os placares e o estado da rodada, voltando ao estado inicial
 export function resetGameScores() {
     stopReveal();
-    Object.assign(gameStore.score, initialState.score); 
-    Object.assign(gameStore, initialRoundState()); 
-    gameStore.gameStatus = 'idle'; 
+    Object.assign(gameStore.score, initialState.score);
+    Object.assign(gameStore, initialRoundState());
+    gameStore.gameStatus = 'idle';
 }

@@ -2,7 +2,7 @@
   <div class="game-container">
     <!-- Se o jogo está 'idle', mostra APENAS a SplashScreen -->
     <SplashScreen
-      v-if="gameStore.gameStatus === 'idle'"
+      v-if="gameStore.gameStatus === ('idle' as GameStatus)"
       @start-game="startNewRound"
       @select-connection="handleConexaoClick"
       @select-bug="handleBugClick"
@@ -40,7 +40,8 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
 import { gameStore, startNewRound, selectTeam, submitGuess, stopReveal, resetGameScores } from '../store/gameStore';
-import { TeamColor } from '../types';
+import { TeamColor, GameStatus } from '../types'; // <-- Importe GameStatus
+import { addToast } from '../store/toastStore'; // <-- NOVA IMPORTAÇÃO
 
 import SplashScreen from '../components/SplashScreen.vue';
 import GameHeader from '../components/GameHeader.vue';
@@ -67,17 +68,7 @@ export default defineComponent({
     const handleGuessModalClose = () => {
       stopReveal();
       gameStore.gameStatus = 'finished';
-      alert('Palpite cancelado. A rodada foi finalizada sem um palpite.');
-    };
-
-    const handleConexaoClick = () => {
-      alert('Funcionalidade de "Conexão" ainda não implementada.');
-      console.log('Botão Conexão clicado.');
-    };
-
-    const handleBugClick = () => {
-      alert('Funcionalidade de "Bug" ainda não implementada.');
-      console.log('Botão Bug clicado.');
+      addToast('Palpite cancelado. A rodada foi finalizada sem um palpite.', 'info'); // <-- CORRIGIDO AQUI
     };
 
     return {
@@ -87,14 +78,13 @@ export default defineComponent({
       handleTeamSelect,
       handleGuessSubmit,
       handleGuessModalClose,
-      handleConexaoClick,
-      handleBugClick,
     };
   },
 });
 </script>
 
 <style scoped>
+/* ... seu estilo ... */
 .game-container {
   display: flex;
   flex-direction: column;

@@ -43,7 +43,7 @@ export default defineComponent({
     },
     gridSize: {
       type: Number,
-      default: 4, // e.g., uma grade de 4x4
+      default: 10, // AJUSTADO: Padrão para 10, conforme sua necessidade
     },
     imageWidth: {
       type: Number,
@@ -131,7 +131,32 @@ export default defineComponent({
       updateTilesVisualState(newProgress);
     });
     // Observa mudanças no gridSize ou nas dimensões para re-inicializar
-    watch(() => [props.gridSize, props.imageWidth, props.imageHeight], initializeTiles);
+    // É importante reagir a imageWidth/imageHeight para recalcular os tiles
+    watch(
+      () => [props.gridSize, props.imageWidth, props.imageHeight],
+      ([newGridSize, newImageWidth, newImageHeight], oldValues) => { // 'oldValues' é um array, mas pode ser undefined na primeira execução
+        if (oldValues === undefined) {
+          // Na primeira execução com 'immediate: true', oldValues é undefined.
+          // Consideramos que houve uma mudança que justifica a inicialização.
+          initializeTiles();
+          return;
+        }
+
+        // Se oldValues não for undefined, podemos desestruturá-lo com segurança
+        const [oldGridSize, oldImageWidth, oldImageHeight] = oldValues;
+
+        // Apenas inicialize novamente se houver uma mudança real nas propriedades que afetam o layout dos tiles
+        if (
+          newGridSize !== oldGridSize ||
+          newImageWidth !== oldImageWidth ||
+          newImageHeight !== oldImageHeight
+        ) {
+          initializeTiles();
+        }
+      },
+      { immediate: true }
+    );
+
 
     // Gera o estilo CSS para cada tile
     const getTileStyle = (tile: DisplayTile): CSSProperties => ({
@@ -142,12 +167,10 @@ export default defineComponent({
       backgroundSize: `${props.imageWidth}px ${props.imageHeight}px`,
       transform: `translate(${tile.currentDisplayPos.x}px, ${tile.currentDisplayPos.y}px)`,
       position: 'absolute',
-      zIndex: 0, // Todos os tiles têm o mesmo zIndex
-      opacity: tile.isVisible ? 1 : 0, // NOVO: Opacidade controlada pela visibilidade
-      transition: 'opacity 0.5s ease-out', // Transição suave para a opacidade
-      // Adicionar um background para os tiles não visíveis para esconder a imagem
-      // Use uma cor que "cubra" completamente o tile quando ele não é visível.
-      backgroundColor: '#34495e', // Uma cor escura para ocultar a imagem de fundo
+      zIndex: 0,
+      opacity: tile.isVisible ? 1 : 0,
+      transition: 'opacity 0.5s ease-out',
+      backgroundColor: '#34495e',
     });
 
     // Estilo para o container principal que mantém os tiles
@@ -155,11 +178,11 @@ export default defineComponent({
       width: `${props.imageWidth}px`,
       height: `${props.imageHeight}px`,
       position: 'relative',
-      // removemos overflow: hidden para que o background color do container atue como fundo dos tiles
-      backgroundColor: '#ecf0f1', // Cor de fundo para o container
+      backgroundColor: '#ecf0f1',
       borderRadius: '12px',
       boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
       border: '2px solid #bdc3c7',
+      overflow: 'hidden', // NOVO: Garante que o ImageTiler gerencie seu próprio overflow
     }));
 
     return {
@@ -174,13 +197,13 @@ export default defineComponent({
 <style scoped>
 .image-tiler-container {
   display: block;
-  /* Comentar ou remover o overflow: hidden para permitir que a cor de fundo do container seja visível por trás dos tiles "invisíveis" */
-  /* overflow: hidden; */
+  /* NOVO: Descomentado/Adicionado para garantir o corte interno se necessário */
+  overflow: hidden;
 }
 
 .image-tile {
   background-repeat: no-repeat;
-  will-change: opacity; /* Dica para o navegador para animações de opacidade mais fluidas */
+  will-change: opacity;
 }
 
 .placeholder-image {

@@ -9,15 +9,14 @@
     </div>
 
     <!-- Exibição da Imagem (visível em todas as fases, exceto 'hint') -->
-    <!-- Adicionamos uma ref para capturar a largura do elemento -->
     <div v-show="gameStatus !== 'hint'" class="image-display" ref="imageDisplayRef">
       <ImageTiler
         :key="currentRoundCharacter?.id"
         :image-url="currentRoundCharacter?.imageUrl || ''"
         :reveal-progress="revealProgress"
         :grid-size="10"
-        :image-width="calculatedImageWidth.value"
-        :image-height="calculatedImageHeight.value" 
+        :image-width="calculatedImageWidth"
+        :image-height="calculatedImageHeight"
       />
     </div>
 
@@ -31,54 +30,36 @@
       Rodada finalizada! Era: <strong>{{ currentRoundCharacter?.name }}</strong>
     </p>
 
-    <!-- Botões das Equipes (visíveis apenas na fase 'revealing') -->
-    <div class="team-buttons" v-if="gameStatus === 'revealing'">
-      <TeamButton
-        v-for="color in Object.values(TeamColor)"
-        :key="color"
-        :team-color="color"
-        :team-name="`Equipe ${color}`"
-        :disabled="gameStatus !== 'revealing'"
-        @select-team="selectTeamFromStore"
-      />
-    </div>
-
-    <GuessModal
-      :show="gameStatus === 'guessing'"
-      :active-team="activeTeam"
-      @submit-guess="submitGuessFromStore"
-      @close="$emit('close-guess-modal')"
+    <!-- NOVO: Componente de Feedback do Operador -->
+    <!-- Visível durante as fases de 'guessing' (quando se espera uma resposta) e 'finished' (para avaliação final) -->
+    <AnswerFeedback
+      v-if="gameStatus === 'guessing' || gameStatus === 'finished'"
+      @correct-answer="handleCorrectAnswer"
+      @wrong-answer="handleWrongAnswer"
     />
 
-    <div class="score-board">
-      <h2>Placar Atual 🏆</h2>
-      <ul>
-        <li v-for="(scoreVal, team) in score" :key="team">
-          <span :style="{ color: getTeamColorHex(team as TeamColor) }">{{ team }}</span>: {{ scoreVal }} pontos
-        </li>
-      </ul>
-    </div>
+    <ScoreboardBlocks :score="score" />
   </div>
-  <!-- NOVO: Componente para exibir os toasts -->
+  <!-- Componente para exibir os toasts -->
   <ToastNotification />
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted, PropType } from 'vue'; // Importe ref, onMounted, onUnmounted
+import { defineComponent, ref, onMounted, onUnmounted, watch, nextTick, PropType } from 'vue';
 import ImageTiler from './ImageTiler.vue';
-import TeamButton from './TeamButton.vue';
-import GuessModal from './GuessModal.vue';
 import ToastNotification from './ToastNotification.vue';
+import ScoreboardBlocks from './ScoreboardBlocks.vue';
+import AnswerFeedback from './AnswerFeedback.vue'; // NOVO: Importe o componente AnswerFeedback
 import { Character, GameStatus, TeamColor } from '../types';
-import { proceedToReveal, selectTeam, submitGuess } from '../store/gameStore';
+import { proceedToReveal } from '../store/gameStore'; // Mantém proceedToReveal, mas remove selectTeam e submitGuess
 
 export default defineComponent({
   name: 'GameImagemOculta',
   components: {
     ImageTiler,
-    TeamButton,
-    GuessModal,
     ToastNotification,
+    ScoreboardBlocks,
+    AnswerFeedback, // NOVO: Registre o componente AnswerFeedback
   },
   props: {
     currentRoundCharacter: {
@@ -102,80 +83,86 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['select-team', 'submit-guess', 'close-guess-modal'],
-
+  // O emit 'evaluate-guess' é uma sugestão para a lógica do jogo
+  emits: ['evaluate-guess'], // Removidos 'select-team' e 'submit-guess' pois não são mais usados neste componente
   setup(_props, { emit }) {
-    // --- NOVO: Lógica de responsividade da imagem ---
     const imageDisplayRef = ref<HTMLElement | null>(null);
-    const calculatedImageWidth = ref(500); // Valor inicial
-    const calculatedImageHeight = ref(350); // Valor inicial
-    const originalAspectRatio = 500 / 350; // Aspect ratio da imagem original
+    const calculatedImageWidth = ref(500);
+    const calculatedImageHeight = ref(350);
+    const originalAspectRatio = 500 / 350;
+    const fixedGridSize = 10;
 
     const updateImageDimensions = () => {
       if (imageDisplayRef.value) {
         let newWidth = imageDisplayRef.value.offsetWidth;
-        // Limita a largura ao tamanho original máximo de 500px para desktop
         if (newWidth > 500) {
           newWidth = 500;
+        }
+        newWidth = Math.floor(newWidth / fixedGridSize) * fixedGridSize;
+        if (newWidth < fixedGridSize) {
+            newWidth = fixedGridSize;
         }
         calculatedImageWidth.value = newWidth;
         calculatedImageHeight.value = newWidth / originalAspectRatio;
       }
     };
 
+    watch([() => _props.gameStatus, imageDisplayRef], ([newGameStatus, newImageDisplayRef]) => {
+      if (newGameStatus !== 'hint' && newImageDisplayRef) {
+        nextTick(() => {
+          updateImageDimensions();
+        });
+      }
+    }, { immediate: true });
+
     onMounted(() => {
-      updateImageDimensions(); // Calcula as dimensões no carregamento inicial
-      window.addEventListener('resize', updateImageDimensions); // Recalcula ao redimensionar a janela
+      window.addEventListener('resize', updateImageDimensions);
     });
 
     onUnmounted(() => {
-      window.removeEventListener('resize', updateImageDimensions); // Remove o listener ao destruir o componente
+      window.removeEventListener('resize', updateImageDimensions);
     });
-    // --- FIM: Lógica de responsividade da imagem ---
 
-
-    const selectTeamFromStore = (team: TeamColor) => {
-      selectTeam(team);
-      emit('select-team', team);
+    // NOVO: Funções para lidar com o feedback do operador (Correto/Errado)
+    const handleCorrectAnswer = () => {
+        console.log('Resposta confirmada como CORRETA!');
+        // Aqui você chamaria a lógica da sua store para registrar a pontuação
+        // Por exemplo: emit('evaluate-guess', true);
+        // Ou diretamente: gameStore.evaluateGuess(true, _props.activeTeam);
+        // Estou usando emit para manter a separação de responsabilidades
+        emit('evaluate-guess', true);
     };
 
-    const submitGuessFromStore = (guessText: string) => {
-      submitGuess(guessText);
-      emit('submit-guess', guessText);
-    };
-
-    const getTeamColorHex = (team: TeamColor) => {
-      switch (team) {
-        case TeamColor.BLUE: return '#3498db';
-        case TeamColor.RED: return '#e74c3c';
-        case TeamColor.GREEN: return '#2ecc71';
-        case TeamColor.YELLOW: return '#f1c40f';
-        default: return '#333';
-      }
+    const handleWrongAnswer = () => {
+        console.log('Resposta confirmada como ERRADA!');
+        // Aqui você chamaria a lógica da sua store para não registrar pontos, etc.
+        // Por exemplo: emit('evaluate-guess', false);
+        // Ou diretamente: gameStore.evaluateGuess(false, _props.activeTeam);
+        emit('evaluate-guess', false);
     };
 
     return {
-      TeamColor,
-      getTeamColorHex,
       proceedToReveal,
-      selectTeamFromStore,
-      submitGuessFromStore,
-      // --- NOVO: Expor as refs e valores calculados para o template ---
       imageDisplayRef,
       calculatedImageWidth,
       calculatedImageHeight,
-      // --- FIM ---
+      handleCorrectAnswer, // NOVO: Exponha para o template
+      handleWrongAnswer,   // NOVO: Exponha para o template
+      // Removidos `selectTeamFromStore` e `submitGuessFromStore` pois não são usados mais no template atual
     };
   },
 });
 </script>
 
 <style scoped>
+/* Seus estilos CSS para GameImagemOculta.vue permanecem inalterados. */
+/* A seção .team-buttons foi removida no template fornecido, então seus estilos também podem ser removidos */
+
 .game-active-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%; /* Garante que ocupe 100% da largura do pai */
+  width: 100%;
   max-width: 800px;
   padding-top: 20px;
 }
@@ -185,17 +172,16 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* min-height: 350px; <-- REMOVIDO OU AJUSTADO para ser responsivo */
-  min-height: 200px; /* Min-height menor para mobile, ou ajuste conforme o conteúdo */
-  width: 100%; /* Ocupa 100% da largura disponível */
-  max-width: 500px; /* Limita a largura em telas maiores */
+  min-height: 200px;
+  width: 100%;
+  max-width: 500px;
   background-color: #f8f8f8;
   border-radius: 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 25px;
   padding: 20px;
   text-align: center;
-  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura total */
+  box-sizing: border-box;
 }
 
 .hint-text {
@@ -224,9 +210,8 @@ export default defineComponent({
 }
 
 .image-display {
-  width: 100%; /* Ocupa 100% da largura disponível */
-  /* height: 350px; <-- REMOVIDO, a altura será definida pelo ImageTiler dinamicamente */
-  max-width: 500px; /* Limita a largura em telas maiores */
+  width: 100%;
+  max-width: 500px;
   background-color: #ecf0f1;
   display: flex;
   justify-content: center;
@@ -234,8 +219,8 @@ export default defineComponent({
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 25px;
-  min-height: 200px; /* Adiciona um min-height para evitar colapso em mobile */
-  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura total */
+  min-height: 200px;
+  box-sizing: border-box;
 }
 
 .timer-info {
@@ -246,77 +231,7 @@ export default defineComponent({
   text-align: center;
 }
 
-.team-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 35px;
-  width: 100%;
-  max-width: 650px;
-}
-
-.score-board {
-  background-color: #ffffff;
-  padding: 25px;
-  border-radius: 12px;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-  margin-top: 30px;
-  width: 100%;
-  max-width: 450px;
-  text-align: left;
-  border: 1px solid #eee;
-  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura total */
-}
-
-.score-board h2 {
-  color: #34495e;
-  margin-bottom: 20px;
-  text-align: center;
-  font-size: 1.8em;
-}
-
-.score-board ul {
-  list-style: none;
-  padding: 0;
-}
-
-.score-board li {
-  font-size: 1.2em;
-  padding: 10px 0;
-  border-bottom: 1px dashed #e0e0e0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.score-board li:last-child {
-  border-bottom: none;
-}
-
-/* Ajustes para telas menores (mobile) */
-@media (max-width: 600px) {
-  .hint-text {
-    font-size: 1.5em; /* Fonte menor para a dica em mobile */
-  }
-  .timer-info {
-    font-size: 1.1em; /* Fonte menor para info do timer */
-  }
-  .proceed-button {
-    padding: 12px 25px;
-    font-size: 1.1em;
-  }
-  .team-buttons {
-    gap: 10px; /* Espaçamento menor entre botões */
-  }
-  .score-board {
-    padding: 15px; /* Padding menor no placar */
-  }
-  .score-board h2 {
-    font-size: 1.5em;
-  }
-  .score-board li {
-    font-size: 1.1em;
-  }
-}
+/* Os estilos para .team-buttons foram removidos, pois o componente TeamButton não está mais no template */
+/* Você pode remover a regra @media (max-width: 600px) que se refere a .team-buttons também */
+/* ... (Mantenha o restante dos seus estilos se ainda forem relevantes para outros elementos) */
 </style>

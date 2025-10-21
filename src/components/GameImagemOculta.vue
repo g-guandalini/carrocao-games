@@ -103,7 +103,7 @@ export default defineComponent({
   },
   emits: ['select-team', 'submit-guess', 'close-guess-modal'], // Esses emits agora chamarão as funções do gameStore
 
-  setup(props, { emit }) {
+  setup(_props, { emit }) {
     // Função para chamar o selectTeam do gameStore
     const selectTeamFromStore = (team: TeamColor) => {
       selectTeam(team);

@@ -1,23 +1,26 @@
+// stores/gameStore.ts
 import { reactive } from 'vue';
-import { GameState, TeamColor, Character } from '../types';
+import { GameState, TeamColor, Character, GameStatus } from '../types';
+// IMPORTANTE: Importe o 'addToast' como uma exportação nomeada separada!
+import { toastStore, addToast } from './toastStore'; 
 
-// Lista de personagens para o jogo
+// Lista de personagens para o jogo (com as novas dicas)
 const ALL_CHARACTERS: Character[] = [
-  { id: '1', name: 'Mickey Mouse', imageUrl: '/characters/mickey.png' },
-  { id: '2', name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png' },
-  { id: '3', name: 'Pikachu', imageUrl: '/characters/pikachu.png' },
-  { id: '4', name: 'Goku', imageUrl: '/characters/goku.png' },
-  { id: '5', name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png' },
-  { id: '6', name: 'Batman', imageUrl: '/characters/batman.png' },
-  { id: '7', name: 'Capitão America', imageUrl: '/characters/capitao_america.png' },
-  { id: '8', name: 'Mulher Maravilha', imageUrl: '/characters/mulher_maravilha.png' },
+  { id: '1', name: 'Mickey Mouse', imageUrl: '/characters/mickey.png', hint: 'Um famoso rato falante de desenhos animados.' },
+  { id: '2', name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png', hint: 'Um herói que escala paredes e solta teias.' },
+  { id: '3', name: 'Pikachu', imageUrl: '/characters/pikachu.png', hint: 'Um monstrinho amarelo que libera choques elétricos.' },
+  { id: '4', name: 'Goku', imageUrl: '/characters/goku.png', hint: 'Um guerreiro alienígena com cabelo espetado que adora lutar.' },
+  { id: '5', name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png', hint: 'Um bilionário que usa uma armadura de alta tecnologia.' },
+  { id: '6', name: 'Batman', imageUrl: '/characters/batman.png', hint: 'O Cavaleiro das Trevas que protege Gotham City.' },
+  { id: '7', name: 'Capitão America', imageUrl: '/characters/capitao_america.png', hint: 'Um super-soldado com um escudo patriótico.' },
+  { id: '8', name: 'Mulher Maravilha', imageUrl: '/characters/mulher_maravilha.png', hint: 'Uma princesa amazona com um laço mágico.' },
 ];
 
 // Estado inicial para uma rodada (sem resetar o placar)
 const initialRoundState = () => ({
-  currentRoundCharacter: null,
-  revealProgress: 0, // 0 (completamente embaralhada) a 1 (nítida/reorganizada)
-  gameStatus: 'idle' as 'idle' | 'revealing' | 'guessing' | 'finished',
+  currentRoundCharacter: null as Character | null,
+  revealProgress: 0,
+  gameStatus: 'idle' as GameStatus, 
   activeTeam: null as TeamColor | null,
   guess: '',
 });
@@ -45,32 +48,45 @@ const REVEAL_STEP_MS = 100; // Atualiza a cada 100ms
 function pickRandomCharacter(): Character {
   const availableCharacters = gameStore.characters.filter(char => char.id !== gameStore.currentRoundCharacter?.id);
   if (availableCharacters.length === 0) {
-      // Se todos os personagens foram usados, reinicia a lista
+      toastStore.addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
+      // Precisa usar 'addToast' diretamente aqui, não 'toastStore.addToast'
+      // Corrigido:
+      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
       return gameStore.characters[Math.floor(Math.random() * gameStore.characters.length)];
   }
   return availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
 }
 
-// Inicia uma nova rodada do jogo
+// Inicia uma nova rodada, começando pela fase de dica
 export function startNewRound() {
-  stopReveal(); // Limpa qualquer intervalo anterior
+  stopReveal(); 
 
-  // Reseta o estado específico da rodada
   Object.assign(gameStore, initialRoundState());
 
   gameStore.currentRoundCharacter = pickRandomCharacter();
-  gameStore.gameStatus = 'revealing';
+  gameStore.gameStatus = 'hint'; 
+}
 
+// Prossegue da fase de dica para a fase de revelação da imagem
+export function proceedToReveal() {
+  if (!gameStore.currentRoundCharacter) {
+    // Corrigido:
+    addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error');
+    return;
+  }
+  gameStore.gameStatus = 'revealing';
   revealInterval = setInterval(() => {
     gameStore.revealProgress += REVEAL_STEP_MS / REVEAL_DURATION_MS;
     if (gameStore.revealProgress >= 1) {
-      gameStore.revealProgress = 1; // Garante que atinge 1.0
+      gameStore.revealProgress = 1; 
       stopReveal();
-      gameStore.gameStatus = 'finished'; // Ninguém adivinhou, imagem totalmente revelada
-      alert(`Tempo esgotado! A imagem completa era ${gameStore.currentRoundCharacter?.name}.`);
+      gameStore.gameStatus = 'finished'; 
+      // Corrigido:
+      addToast(`Tempo esgotado! A imagem completa era: <strong>${gameStore.currentRoundCharacter?.name}</strong>`, 'info');
     }
   }, REVEAL_STEP_MS) as unknown as number;
 }
+
 
 // Para a revelação da imagem
 export function stopReveal() {
@@ -83,9 +99,9 @@ export function stopReveal() {
 // Seleciona uma equipe quando um botão é pressionado
 export function selectTeam(team: TeamColor) {
   if (gameStore.gameStatus === 'revealing') {
-    stopReveal(); // Para a revelação
+    stopReveal(); 
     gameStore.activeTeam = team;
-    gameStore.gameStatus = 'guessing'; // Entra em modo de palpite
+    gameStore.gameStatus = 'guessing'; 
   }
 }
 
@@ -97,18 +113,20 @@ export function submitGuess(guessText: string) {
 
     if (isCorrect) {
       gameStore.score[gameStore.activeTeam]++;
-      alert(`🎉 Equipe ${gameStore.activeTeam} acertou! Placar atual: ${gameStore.activeTeam} - ${gameStore.score[gameStore.activeTeam]} pontos.`);
+      // Corrigido:
+      addToast(`🎉 Equipe <strong>${gameStore.activeTeam}</strong> acertou! Placar: <strong>${gameStore.activeTeam}</strong> - <strong>${gameStore.score[gameStore.activeTeam]}</strong> pontos.`, 'success');
     } else {
-      alert(`❌ Equipe ${gameStore.activeTeam} errou! A resposta correta era: ${gameStore.currentRoundCharacter.name}.`);
+      // Corrigido:
+      addToast(`❌ Equipe <strong>${gameStore.activeTeam}</strong> errou! A resposta correta era: <strong>${gameStore.currentRoundCharacter.name}</strong>.`, 'error');
     }
-    gameStore.gameStatus = 'finished'; // A rodada termina após o palpite
+    gameStore.gameStatus = 'finished'; 
   }
 }
 
 // Reseta apenas os placares e o estado da rodada, voltando ao estado inicial
 export function resetGameScores() {
     stopReveal();
-    Object.assign(gameStore.score, initialState.score); // Reseta apenas os placares
-    Object.assign(gameStore, initialRoundState()); // Reseta o estado da rodada
-    gameStore.gameStatus = 'idle'; // Volta ao estado ocioso para começar um novo jogo do zero
+    Object.assign(gameStore.score, initialState.score); 
+    Object.assign(gameStore, initialRoundState()); 
+    gameStore.gameStatus = 'idle'; 
 }

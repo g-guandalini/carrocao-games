@@ -12,8 +12,8 @@
     <template v-else>
       <GameHeader />
       
-      <!-- A GamePlayArea só aparece se currentRoundCharacter estiver definido -->
-      <GamePlayArea
+      <!-- A GameImagemOculta só aparece se currentRoundCharacter estiver definido -->
+      <GameImagemOculta
         v-if="gameStore.currentRoundCharacter"
         :current-round-character="gameStore.currentRoundCharacter"
         :reveal-progress="gameStore.revealProgress"
@@ -44,15 +44,15 @@ import { TeamColor } from '../types';
 
 import SplashScreen from '../components/SplashScreen.vue';
 import GameHeader from '../components/GameHeader.vue';
-import GamePlayArea from '../components/GamePlayArea.vue';
 import GameActionButtons from '../components/GameActionButtons.vue';
+import GameImagemOculta from '../components/GameImagemOculta.vue';
 
 export default defineComponent({
   name: 'GameView',
   components: {
     SplashScreen,
     GameHeader,
-    GamePlayArea,
+    GameImagemOculta,
     GameActionButtons,
   },
   setup() {

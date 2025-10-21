@@ -30,7 +30,7 @@
   export default defineComponent({
     name: 'AnswerFeedback',
     emits: ['correct-answer', 'wrong-answer'], // Eventos que este componente irá emitir
-    setup(props, { emit }) {
+    setup(_props, { emit }) {
       // 'activeEffect' controla qual botão está com o efeito de brilho/suspense
       const activeEffect = ref<'correct' | 'wrong' | null>(null);
   

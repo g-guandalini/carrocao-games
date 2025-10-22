@@ -1,14 +1,17 @@
 <template>
   <div class="game-active-section">
-    <!-- NOVO: Seção da Dica (visível apenas na fase 'hint') -->
+    <!-- Seção da Dica (visível apenas na fase 'hint') -->
     <div v-if="gameStatus === 'hint' && currentRoundCharacter" class="hint-container">
-      <p class="hint-text">Dica: <strong>{{ currentRoundCharacter.hint }}</strong></p>
-      <button @click="proceedToReveal" class="proceed-button">
-        Prosseguir
+      <span class="hint-label">A Dica é:</span>
+      <p class="hint-content">
+        {{ displayedHint }}<span v-if="isTyping" class="blinking-cursor">|</span>
+      </p>
+      <button @click="stopTypingAndProceed" class="proceed-button">
+        Prosseguir para a Imagem
       </button>
     </div>
 
-    <!-- Exibição da Imagem (visível em todas as fases, exceto 'hint') -->
+    <!-- Exibição da Imagem (visível em todas as fases, exceto 'hint' e 'scoreboard') -->
     <div v-show="gameStatus !== 'hint'" class="image-display" ref="imageDisplayRef">
       <ImageTiler
         :key="currentRoundCharacter?.id"
@@ -20,46 +23,57 @@
       />
     </div>
 
+    <!-- Texto de instrução sem quebras de linha indesejadas -->
     <p class="timer-info" v-if="gameStatus === 'revealing'">
-      A imagem está revelando... <strong>{{ (revealProgress * 100).toFixed(0) }}%</strong>
+      Pressione <strong style="color: blue;">1 (Azul)</strong>, <strong style="color: red;">2 (Vermelho)</strong>, <strong style="color: green;">3 (Verde)</strong> ou <strong style="color: yellow;">4 (Amarelo)</strong> para palpitar!
     </p>
-    <p class="timer-info" v-if="gameStatus === 'guessing' && activeTeam">
-      <strong>{{ activeTeam }}</strong> é a vez de palpitar! ⏳
+    <!-- Mensagem "Aguardando resposta da equipe" -->
+    <p class="timer-info guessing-message" v-if="gameStatus === 'guessing' && activeTeam">
+      Aguardando resposta da equipe <strong :style="{ color: teamColorToHex(activeTeam) }">{{ activeTeam }}</strong>! ⏳
+      <!-- Exibe a pontuação potencial da rodada -->
+      <br>Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
     </p>
-    <p class="timer-info" v-if="gameStatus === 'finished'">
-      Rodada finalizada! Era: <strong>{{ currentRoundCharacter?.name }}</strong>
-    </p>
+    <!-- Container para a mensagem finalizada e o botão "Ver Placar" -->
+    <div v-if="gameStatus === 'finished'" class="finished-status-container">
+      <p class="timer-info no-margin-bottom">
+        Rodada finalizada! Respota Correta: <strong>{{ currentRoundCharacter?.name }}</strong>
+      </p>
+      <button @click="$emit('view-scoreboard')" class="view-scoreboard-button">
+        Ver Placar
+      </button>
+    </div>
 
-    <!-- NOVO: Componente de Feedback do Operador -->
-    <!-- Visível durante as fases de 'guessing' (quando se espera uma resposta) e 'finished' (para avaliação final) -->
+    <!-- Componente de Feedback do Operador - Visível apenas na fase 'guessing' -->
     <AnswerFeedback
-      v-if="gameStatus === 'guessing' || gameStatus === 'finished'"
+      v-if="gameStatus === 'guessing'"
       @correct-answer="handleCorrectAnswer"
       @wrong-answer="handleWrongAnswer"
     />
 
-    <ScoreboardBlocks :score="score" />
+    <!-- Componente para exibir os toasts -->
+    <ToastNotification />
+
+    <!-- Elementos de áudio -->
+    <audio ref="typingAudio" src="/sounds/typing-sound.mp3" preload="auto" loop></audio>
+    <audio ref="correctAnswerAudio" src="/sounds/correct-answer.mp3" preload="auto"></audio>
+    <audio ref="failAnswerAudio" src="/sounds/fail-answer.mp3" preload="auto"></audio>
   </div>
-  <!-- Componente para exibir os toasts -->
-  <ToastNotification />
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted, watch, nextTick, PropType } from 'vue';
+import { defineComponent, ref, onMounted, onUnmounted, watch, nextTick, computed, PropType } from 'vue'; // Importar 'computed'
 import ImageTiler from './ImageTiler.vue';
 import ToastNotification from './ToastNotification.vue';
-import ScoreboardBlocks from './ScoreboardBlocks.vue';
-import AnswerFeedback from './AnswerFeedback.vue'; // NOVO: Importe o componente AnswerFeedback
+import AnswerFeedback from './AnswerFeedback.vue';
 import { Character, GameStatus, TeamColor } from '../types';
-import { proceedToReveal } from '../store/gameStore'; // Mantém proceedToReveal, mas remove selectTeam e submitGuess
+import { proceedToReveal } from '../store/gameStore';
 
 export default defineComponent({
   name: 'GameImagemOculta',
   components: {
     ImageTiler,
     ToastNotification,
-    ScoreboardBlocks,
-    AnswerFeedback, // NOVO: Registre o componente AnswerFeedback
+    AnswerFeedback,
   },
   props: {
     currentRoundCharacter: {
@@ -83,20 +97,87 @@ export default defineComponent({
       required: true,
     },
   },
-  // O emit 'evaluate-guess' é uma sugestão para a lógica do jogo
-  emits: ['evaluate-guess'], // Removidos 'select-team' e 'submit-guess' pois não são mais usados neste componente
+  // O evento 'evaluate-guess' agora espera dois argumentos: isCorrect (boolean) e scoreAwarded (number)
+  emits: ['evaluate-guess', 'view-scoreboard'], 
   setup(_props, { emit }) {
     const imageDisplayRef = ref<HTMLElement | null>(null);
-    const calculatedImageWidth = ref(500);
-    const calculatedImageHeight = ref(350);
-    const originalAspectRatio = 500 / 350;
+    const typingAudio = ref<HTMLAudioElement | null>(null);
+    const correctAnswerAudio = ref<HTMLAudioElement | null>(null);
+    const failAnswerAudio = ref<HTMLAudioElement | null>(null);
+
+    const calculatedImageWidth = ref(960);
+    const calculatedImageHeight = ref(540);
+    const originalAspectRatio = 16 / 9;
     const fixedGridSize = 10;
+
+    const displayedHint = ref('');
+    const isTyping = ref(false);
+    let typingInterval: number | null = null;
+
+    // ----- NOVA PROPRIEDADE COMPUTADA PARA A PONTUAÇÃO DA RODADA -----
+    const currentPotentialRoundScore = computed(() => {
+      // 100 pontos iniciais por rodada
+      const initialScore = 100;
+      // Quantidade de tiles revelados (revealProgress vai de 0 a 1)
+      // Multiplicamos por 100 para ter a contagem de tiles (já que são 100 tiles no total)
+      const tilesRevealed = Math.floor(_props.revealProgress * 100);
+      // Deduz 1 ponto por tile revelado
+      const deductedPoints = tilesRevealed;
+      // Garante que a pontuação não seja menor que 0
+      return Math.max(0, initialScore - deductedPoints);
+    });
+    // ------------------------------------------------------------------
+
+    const typeHint = (fullHint: string) => {
+      if (typingInterval !== null) clearInterval(typingInterval);
+      if (typingAudio.value) {
+        typingAudio.value.pause();
+        typingAudio.value.currentTime = 0;
+      }
+
+      displayedHint.value = '';
+      isTyping.value = true;
+
+      let charIndex = 0;
+      const typingSpeed = 77;
+
+      if (typingAudio.value) {
+        typingAudio.value.play().catch(e => console.warn("Autoplay de áudio bloqueado:", e));
+      }
+
+      typingInterval = setInterval(() => {
+        if (charIndex < fullHint.length) {
+          displayedHint.value += fullHint[charIndex];
+          charIndex++;
+        } else {
+          if (typingInterval !== null) clearInterval(typingInterval);
+          typingInterval = null;
+          isTyping.value = false;
+          if (typingAudio.value) typingAudio.value.pause();
+        }
+      }, typingSpeed);
+    };
+
+    const stopTypingAndAudio = () => {
+      if (typingInterval !== null) clearInterval(typingInterval);
+      typingInterval = null;
+      isTyping.value = false;
+      if (typingAudio.value) {
+        typingAudio.value.pause();
+        typingAudio.value.currentTime = 0;
+      }
+    };
+
+    const stopTypingAndProceed = () => {
+      stopTypingAndAudio();
+      proceedToReveal();
+    };
 
     const updateImageDimensions = () => {
       if (imageDisplayRef.value) {
         let newWidth = imageDisplayRef.value.offsetWidth;
-        if (newWidth > 500) {
-          newWidth = 500;
+        if (newWidth > 960) {
+          newWidth = 960;
         }
         newWidth = Math.floor(newWidth / fixedGridSize) * fixedGridSize;
         if (newWidth < fixedGridSize) {
@@ -107,7 +188,15 @@ export default defineComponent({
       }
     };
 
-    watch([() => _props.gameStatus, imageDisplayRef], ([newGameStatus, newImageDisplayRef]) => {
+    watch([() => _props.gameStatus, imageDisplayRef, () => _props.currentRoundCharacter], ([newGameStatus, newImageDisplayRef, newCharacter]) => {
+      if (newGameStatus === 'hint' && newCharacter?.hint) {
+        nextTick(() => {
+          typeHint(newCharacter.hint);
+        });
+      } else {
+        stopTypingAndAudio();
+      }
+
       if (newGameStatus !== 'hint' && newImageDisplayRef) {
         nextTick(() => {
           updateImageDimensions();
@@ -121,49 +210,65 @@ export default defineComponent({
 
     onUnmounted(() => {
       window.removeEventListener('resize', updateImageDimensions);
+      stopTypingAndAudio();
     });
 
-    // NOVO: Funções para lidar com o feedback do operador (Correto/Errado)
+    const teamColorToHex = (team: TeamColor | null) => {
+      switch (team) {
+        case TeamColor.BLUE: return '#3498db';
+        case TeamColor.RED: return '#e74c3c';
+        case TeamColor.GREEN: return '#2ecc71';
+        case TeamColor.YELLOW: return '#f1c40f';
+        default: return '#555';
+      }
+    };
+
     const handleCorrectAnswer = () => {
         console.log('Resposta confirmada como CORRETA!');
-        // Aqui você chamaria a lógica da sua store para registrar a pontuação
-        // Por exemplo: emit('evaluate-guess', true);
-        // Ou diretamente: gameStore.evaluateGuess(true, _props.activeTeam);
-        // Estou usando emit para manter a separação de responsabilidades
-        emit('evaluate-guess', true);
+        if (correctAnswerAudio.value) {
+            correctAnswerAudio.value.currentTime = 0;
+            correctAnswerAudio.value.play().catch(e => console.warn("Autoplay de som de acerto bloqueado:", e));
+        }
+        // Emite true para acerto e a pontuação calculada
+        emit('evaluate-guess', true, currentPotentialRoundScore.value);
     };
 
     const handleWrongAnswer = () => {
         console.log('Resposta confirmada como ERRADA!');
-        // Aqui você chamaria a lógica da sua store para não registrar pontos, etc.
-        // Por exemplo: emit('evaluate-guess', false);
-        // Ou diretamente: gameStore.evaluateGuess(false, _props.activeTeam);
-        emit('evaluate-guess', false);
+        if (failAnswerAudio.value) {
+            failAnswerAudio.value.currentTime = 0;
+            failAnswerAudio.value.play().catch(e => console.warn("Autoplay de som de erro bloqueado:", e));
+        }
+        // Emite false para erro e 0 pontos
+        emit('evaluate-guess', false, 0);
     };
 
     return {
-      proceedToReveal,
+      stopTypingAndProceed,
       imageDisplayRef,
+      typingAudio,
+      correctAnswerAudio,
+      failAnswerAudio,
+      displayedHint,
+      isTyping,
+      currentPotentialRoundScore, // Retornar para o template
       calculatedImageWidth,
       calculatedImageHeight,
-      handleCorrectAnswer, // NOVO: Exponha para o template
-      handleWrongAnswer,   // NOVO: Exponha para o template
-      // Removidos `selectTeamFromStore` e `submitGuessFromStore` pois não são usados mais no template atual
+      handleCorrectAnswer,
+      handleWrongAnswer,
+      teamColorToHex,
     };
   },
 });
 </script>
 
 <style scoped>
-/* Seus estilos CSS para GameImagemOculta.vue permanecem inalterados. */
-/* A seção .team-buttons foi removida no template fornecido, então seus estilos também podem ser removidos */
-
 .game-active-section {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 800px;
+  max-width: 1060px;
   padding-top: 20px;
 }
 
@@ -172,46 +277,73 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  min-height: 250px;
   width: 100%;
-  max-width: 500px;
-  background-color: #f8f8f8;
-  border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-  margin-bottom: 25px;
-  padding: 20px;
+  max-width: 700px;
+  background-color: #fcfcfc;
+  border-radius: 15px;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 35px;
+  padding: 30px;
   text-align: center;
   box-sizing: border-box;
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s ease;
 }
 
-.hint-text {
-  font-size: 1.8em;
+.hint-label {
+  font-size: 1.1em;
+  font-weight: 500;
+  color: #7f8c8d;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.hint-content {
+  font-family: 'monospace', 'Courier New', Courier, monospace;
+  font-size: 2.2em;
   font-weight: 600;
-  color: #34495e;
-  margin-bottom: 30px;
+  color: #2c3e50;
+  margin-bottom: 40px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  min-height: 3em;
+}
+
+.blinking-cursor {
+  font-weight: 300;
+  color: #2c3e50;
+  animation: blink 0.7s infinite;
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 .proceed-button {
-  background-color: #2ecc71;
+  background-color: #3498db;
   color: white;
-  padding: 15px 30px;
+  padding: 16px 32px;
   border: none;
   border-radius: 8px;
   font-size: 1.3em;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .proceed-button:hover {
-  background-color: #27ae60;
+  background-color: #2980b9;
   transform: translateY(-2px);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
 }
 
 .image-display {
   width: 100%;
-  max-width: 500px;
+  max-width: 960px;
   background-color: #ecf0f1;
   display: flex;
   justify-content: center;
@@ -231,7 +363,39 @@ export default defineComponent({
   text-align: center;
 }
 
-/* Os estilos para .team-buttons foram removidos, pois o componente TeamButton não está mais no template */
-/* Você pode remover a regra @media (max-width: 600px) que se refere a .team-buttons também */
-/* ... (Mantenha o restante dos seus estilos se ainda forem relevantes para outros elementos) */
+.timer-info.no-margin-bottom {
+  margin-bottom: 0;
+}
+
+.guessing-message {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #34495e;
+}
+
+.finished-status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.view-scoreboard-button {
+  background-color: #3498db;
+  color: white;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.view-scoreboard-button:hover {
+  background-color: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+}
 </style>

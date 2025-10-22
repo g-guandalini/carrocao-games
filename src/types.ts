@@ -10,24 +10,24 @@ export interface Character {
   id: string;
   name: string;
   imageUrl: string;
-  hint: string; // NOVA propriedade
+  hint: string;
 }
 
-export type GameStatus = 'idle' | 'hint' | 'revealing' | 'guessing' | 'finished'; // NOVO status 'hint'
+// NOVO: Adicionado 'scoreboard' ao GameStatus
+export type GameStatus = 'idle' | 'hint' | 'revealing' | 'guessing' | 'finished' | 'scoreboard';
 
 export interface GameState {
   currentRoundCharacter: Character | null;
   revealProgress: number;
   gameStatus: GameStatus;
   activeTeam: TeamColor | null;
-  guess: string;
   score: Record<TeamColor, number>;
   characters: Character[];
 }
 
-export type ToastType = 'success' | 'error' | 'info'; // NOVO tipo para toasts
+export type ToastType = 'success' | 'error' | 'info';
 
-export interface Toast { // NOVA interface para toasts
+export interface Toast {
   id: number;
   message: string;
   type: ToastType;

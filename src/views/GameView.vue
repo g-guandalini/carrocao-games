@@ -1,50 +1,46 @@
 <template>
   <div class="game-container">
-    <!-- Se o jogo está 'idle', mostra APENAS a SplashScreen -->
+    <GameHeader v-if="gameStore.gameStatus !== 'idle'" />
+
     <SplashScreen
       v-if="gameStore.gameStatus === ('idle' as GameStatus)"
       @start-game="startNewRound"
     />
 
-    <!-- Se o jogo NÃO está 'idle', mostra o resto da interface do jogo -->
-    <template v-else>
-      <GameHeader />
-      
-      <!-- A GameImagemOculta só aparece se currentRoundCharacter estiver definido -->
-      <GameImagemOculta
-        v-if="gameStore.currentRoundCharacter"
-        :current-round-character="gameStore.currentRoundCharacter"
-        :reveal-progress="gameStore.revealProgress"
-        :game-status="gameStore.gameStatus"
-        :active-team="gameStore.activeTeam"
-        :score="gameStore.score"
-        @select-team="handleTeamSelect"
-        @submit-guess="handleGuessSubmit"
-        @close-guess-modal="handleGuessModalClose"
-      />
-      <!-- Você pode adicionar um else aqui para mostrar um "Carregando..."
-           se gameStore.gameStatus não é idle mas currentRoundCharacter ainda é null -->
-      <p v-else-if="gameStore.gameStatus !== 'idle'" class="loading-message">Carregando personagem...</p>
+    <GameImagemOculta
+      v-else-if="['hint', 'revealing', 'guessing', 'finished'].includes(gameStore.gameStatus)"
+      :current-round-character="gameStore.currentRoundCharacter"
+      :reveal-progress="gameStore.revealProgress"
+      :game-status="gameStore.gameStatus"
+      :active-team="gameStore.activeTeam"
+      :score="gameStore.score"
+      @evaluate-guess="handleOperatorFeedback" 
+      @view-scoreboard="viewScoreboardFromGame"
+    />
 
-      <GameActionButtons
-        :game-status="gameStore.gameStatus"
-        @next-round="startNewRound"
-        @reset-game="resetGameScores"
-      />
-    </template>
+    <ScoreboardScreen
+      v-else-if="gameStore.gameStatus === 'scoreboard'"
+      :score="gameStore.score"
+      :game-status="gameStore.gameStatus"
+      @next-round="startNewRound"
+      @reset-game="resetGameScores"
+    />
+
+    <p v-else-if="gameStore.gameStatus !== 'idle' && !gameStore.currentRoundCharacter" class="loading-message">
+      Carregando personagem...
+    </p>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
-import { gameStore, startNewRound, selectTeam, submitGuess, stopReveal, resetGameScores } from '../store/gameStore';
-import { TeamColor, GameStatus } from '../types'; // <-- Importe GameStatus
-import { addToast } from '../store/toastStore'; // <-- NOVA IMPORTAÇÃO
+import { defineComponent, onMounted, onUnmounted } from 'vue';
+import { gameStore, startNewRound, selectTeam, handleOperatorFeedback as handleOperatorFeedbackInStore, resetGameScores, viewScoreboard } from '../store/gameStore';
+import { TeamColor, GameStatus } from '../types';
 
 import SplashScreen from '../components/SplashScreen.vue';
 import GameHeader from '../components/GameHeader.vue';
-import GameActionButtons from '../components/GameActionButtons.vue';
 import GameImagemOculta from '../components/GameImagemOculta.vue';
+import ScoreboardScreen from '../components/ScoreboardScreen.vue';
 
 export default defineComponent({
   name: 'GameView',
@@ -52,37 +48,57 @@ export default defineComponent({
     SplashScreen,
     GameHeader,
     GameImagemOculta,
-    GameActionButtons,
+    ScoreboardScreen,
   },
   setup() {
-    const handleTeamSelect = (team: TeamColor) => {
-      selectTeam(team);
+    // ALTERAÇÃO AQUI: A função agora aceita o segundo argumento (scoreAwarded)
+    const handleOperatorFeedbackLocal = (isCorrect: boolean, scoreAwarded: number) => {
+      console.log(`[GameView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
+      // E passa ambos os argumentos para a função da store
+      handleOperatorFeedbackInStore(isCorrect, scoreAwarded);
     };
 
-    const handleGuessSubmit = (guess: string) => {
-      submitGuess(guess);
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (gameStore.gameStatus === 'revealing') {
+        let selectedTeam: TeamColor | null = null;
+        switch (event.key) {
+          case '1': selectedTeam = TeamColor.BLUE; break;
+          case '2': selectedTeam = TeamColor.RED; break;
+          case '3': selectedTeam = TeamColor.GREEN; break;
+          case '4': selectedTeam = TeamColor.YELLOW; break;
+        }
+
+        if (selectedTeam) {
+          event.preventDefault();
+          selectTeam(selectedTeam);
+        }
+      }
     };
 
-    const handleGuessModalClose = () => {
-      stopReveal();
-      gameStore.gameStatus = 'finished';
-      addToast('Palpite cancelado. A rodada foi finalizada sem um palpite.', 'info'); // <-- CORRIGIDO AQUI
+    const viewScoreboardFromGame = () => {
+      viewScoreboard();
     };
+
+    onMounted(() => {
+      document.addEventListener('keydown', handleGlobalKeyDown);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    });
 
     return {
       gameStore,
       startNewRound,
       resetGameScores,
-      handleTeamSelect,
-      handleGuessSubmit,
-      handleGuessModalClose,
+      handleOperatorFeedback: handleOperatorFeedbackLocal, // Exportando a função local alterada
+      viewScoreboardFromGame,
     };
   },
 });
 </script>
 
 <style scoped>
-/* ... seu estilo ... */
 .game-container {
   display: flex;
   flex-direction: column;

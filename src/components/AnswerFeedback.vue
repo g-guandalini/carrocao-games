@@ -117,7 +117,6 @@
     padding: 20px;
     background-color: #f0f0f0; /* Fundo sutil */
     border-radius: 15px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
     cursor: crosshair; /* Um cursor mais proeminente para o suspense */
     /* Se você quiser um cursor personalizado maior, precisará de uma imagem: */
     /* cursor: url('/path/to/seu-cursor-maior.png') 16 16, auto; */

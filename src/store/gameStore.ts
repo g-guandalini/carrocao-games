@@ -1,7 +1,7 @@
 // stores/gameStore.ts
 import { reactive } from 'vue';
 import { GameState, TeamColor, Character, GameStatus } from '../types';
-import { addToast } from './toastStore'; // <-- Importação CORRETA
+import { addToast } from './toastStore';
 
 // Lista de personagens para o jogo (com as novas dicas)
 const ALL_CHARACTERS: Character[] = [
@@ -19,9 +19,8 @@ const ALL_CHARACTERS: Character[] = [
 const initialRoundState = () => ({
   currentRoundCharacter: null as Character | null,
   revealProgress: 0,
-  gameStatus: 'idle' as GameStatus, // <-- Especificado o tipo para GameStatus
+  gameStatus: 'idle' as GameStatus,
   activeTeam: null as TeamColor | null,
-  guess: '',
 });
 
 // Estado inicial completo do jogo, incluindo placar
@@ -47,7 +46,10 @@ const REVEAL_STEP_MS = 100;
 function pickRandomCharacter(): Character {
   const availableCharacters = gameStore.characters.filter(char => char.id !== gameStore.currentRoundCharacter?.id);
   if (availableCharacters.length === 0) {
-      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info'); // <-- USO CORRETO
+      addToast('Todos os personagens foram jogados! Reiniciando a lista.', 'info');
+      // Para evitar loop infinito se houver apenas um personagem e ele for sempre o mesmo
+      gameStore.characters = ALL_CHARACTERS; 
+      // Resetar a lista de personagens disponíveis e selecionar um
       return gameStore.characters[Math.floor(Math.random() * gameStore.characters.length)];
   }
   return availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
@@ -57,7 +59,7 @@ function pickRandomCharacter(): Character {
 export function startNewRound() {
   stopReveal();
 
-  Object.assign(gameStore, initialRoundState());
+  Object.assign(gameStore, initialRoundState()); // Reinicia o estado da rodada
 
   gameStore.currentRoundCharacter = pickRandomCharacter();
   gameStore.gameStatus = 'hint';
@@ -66,7 +68,7 @@ export function startNewRound() {
 // Prossegue da fase de dica para a fase de revelação da imagem
 export function proceedToReveal() {
   if (!gameStore.currentRoundCharacter) {
-    addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error'); // <-- USO CORRETO
+    addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error');
     return;
   }
   gameStore.gameStatus = 'revealing';
@@ -75,8 +77,8 @@ export function proceedToReveal() {
     if (gameStore.revealProgress >= 1) {
       gameStore.revealProgress = 1;
       stopReveal();
-      gameStore.gameStatus = 'finished';
-      addToast(`Tempo esgotado! A imagem completa era: <strong>${gameStore.currentRoundCharacter?.name}</strong>`, 'info'); // <-- USO CORRETO
+      gameStore.gameStatus = 'finished'; // A rodada termina aqui, esperando "Ver Placar"
+      addToast(`Tempo esgotado! A imagem completa era: <strong>${gameStore.currentRoundCharacter?.name}</strong>`, 'info');
     }
   }, REVEAL_STEP_MS) as unknown as number;
 }
@@ -90,35 +92,47 @@ export function stopReveal() {
   }
 }
 
-// Seleciona uma equipe quando um botão é pressionado
+// Seleciona uma equipe quando uma tecla é pressionada (chamado de GameView)
 export function selectTeam(team: TeamColor) {
   if (gameStore.gameStatus === 'revealing') {
-    stopReveal();
+    stopReveal(); // Para a revelação da imagem
     gameStore.activeTeam = team;
-    gameStore.gameStatus = 'guessing';
+    gameStore.gameStatus = 'guessing'; // Muda o status para 'guessing'
+    addToast(`Equipe <strong>${team}</strong> irá palpitar!`, 'info');
   }
 }
 
-// Processa o palpite da equipe ativa
-export function submitGuess(guessText: string) {
-  if (gameStore.activeTeam && gameStore.gameStatus === 'guessing' && gameStore.currentRoundCharacter) {
-    gameStore.guess = guessText;
-    const isCorrect = gameStore.currentRoundCharacter.name.toLowerCase() === guessText.toLowerCase().trim();
-
-    if (isCorrect) {
-      gameStore.score[gameStore.activeTeam]++;
-      addToast(`🎉 Equipe <strong>${gameStore.activeTeam}</strong> acertou! Placar: <strong>${gameStore.activeTeam}</strong> - <strong>${gameStore.score[gameStore.activeTeam]}</strong> pontos.`, 'success'); // <-- USO CORRETO
-    } else {
-      addToast(`❌ Equipe <strong>${gameStore.activeTeam}</strong> errou! A resposta correta era: <strong>${gameStore.currentRoundCharacter.name}</strong>.`, 'error'); // <-- USO CORRETO
-    }
-    gameStore.gameStatus = 'finished';
+// Processa o feedback do operador (Correto/Errado)
+// ALTERAÇÃO AQUI: Adicionado 'scoreAwarded' como parâmetro
+export function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: number) {
+  if (!gameStore.activeTeam || !gameStore.currentRoundCharacter) {
+    console.warn("Feedback do operador recebido em um estado inválido ou sem time ativo.");
+    return;
   }
+
+  if (isCorrect) {
+    // ALTERAÇÃO AQUI: Adiciona a pontuação recebida ao invés de apenas 1
+    gameStore.score[gameStore.activeTeam] += scoreAwarded;
+    addToast(`🎉 Equipe <strong>${gameStore.activeTeam}</strong> acertou! Ganhou <strong>${scoreAwarded}</strong> pontos!`, 'success');
+  } else {
+    // Para palpite errado, não adiciona pontos
+    addToast(`❌ Equipe <strong>${gameStore.activeTeam}</strong> errou! A resposta correta era: <strong>${gameStore.currentRoundCharacter.name}</strong>.`, 'error');
+  }
+  
+  gameStore.revealProgress = 1; // Garante que a imagem esteja completa para conferência
+  gameStore.gameStatus = 'finished'; // A rodada termina aqui, esperando "Ver Placar"
+  gameStore.activeTeam = null; // Reseta a equipe ativa
+}
+
+// NOVO: Função para transicionar para a tela do placar
+export function viewScoreboard() {
+  gameStore.gameStatus = 'scoreboard';
 }
 
 // Reseta apenas os placares e o estado da rodada, voltando ao estado inicial
 export function resetGameScores() {
     stopReveal();
-    Object.assign(gameStore.score, initialState.score);
-    Object.assign(gameStore, initialRoundState());
-    gameStore.gameStatus = 'idle';
+    Object.assign(gameStore.score, initialState.score); // Zera os placares
+    Object.assign(gameStore, initialRoundState()); // Reinicia o estado da rodada (currentRoundCharacter, revealProgress, gameStatus, activeTeam)
+    gameStore.gameStatus = 'idle'; // Volta para a tela inicial
 }

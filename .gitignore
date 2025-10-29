@@ -18,3 +18,6 @@
 *.njsproj
 *.sln
 *.bak
+
+/server/node_modules
+/server/db

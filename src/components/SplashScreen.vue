@@ -36,10 +36,8 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
   width: 100%;
   max-width: 800px;
-  margin-top: 50px;
 }
 
 .splash-header-content {

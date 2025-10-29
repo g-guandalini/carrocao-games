@@ -2,7 +2,6 @@
   <div class="splash-screen-wrapper">
     <div class="splash-header-content">
       <div class="splash-logo-area">
-        
         <!-- Se você tiver uma imagem de logo, substitua o span: -->
         <img src="/logo_sitio.png" alt="Carroção Games Logo" class="splash-logo-img">
       </div>
@@ -18,16 +17,48 @@
       <button class="menu-button" @click="$emit('select-bug')">
         Bug
       </button>
+
+      <!-- NOVO: Botão "Limpar Pontos" -->
+      <button v-if="hasScoresToClear" class="menu-button clear-scores-button" @click="clearAllScores">
+        Limpar Pontos
+      </button>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, computed } from 'vue';
+// Importar a store e a função de reset de pontos
+import { imagemOcultaStore, resetGameScores } from '../store/imagemOcultaStore';
 
 export default defineComponent({
   name: 'SplashScreen',
   emits: ['start-game', 'select-connection', 'select-bug'],
+  setup() {
+    // Computa se alguma equipe tem pontuação maior que zero
+    const hasScoresToClear = computed(() => {
+      // Verifica se a store já carregou os scores.
+      // Se ainda estiver carregando, consideramos que não há scores para limpar
+      // para evitar um botão piscando ou decisões com dados antigos.
+      if (imagemOcultaStore.isLoadingScores) {
+        return false;
+      }
+      // Itera sobre as pontuações e verifica se alguma é maior que 0
+      return Object.values(imagemOcultaStore.score).some(score => score > 0);
+    });
+
+    // Função para limpar todas as pontuações
+    const clearAllScores = async () => {
+      if (confirm('Tem certeza que deseja limpar todas as pontuações? Esta ação não pode ser desfeita.')) {
+        await resetGameScores(); // Chama a função de reset do store
+      }
+    };
+
+    return {
+      hasScoresToClear,
+      clearAllScores,
+    };
+  },
 });
 </script>
 
@@ -59,20 +90,18 @@ export default defineComponent({
   align-items: center;
   width: 350px;
   height: 350px;
-  /* Removido: background-color: #ffffff; */
-  /* Removido: border: 4px solid #3498db; */
-  border-radius: 12px; /* Mantém o arredondamento, se desejar */
+  border-radius: 12px;
   margin: 0 auto;
-  background-color: transparent; 
+  background-color: transparent;
 }
 
 /* NOVO CSS PARA A IMAGEM DENTRO DA ÁREA DO LOGO */
 .splash-logo-area .splash-logo-img {
-  max-width: 100%; 
+  max-width: 100%;
   max-height: 100%;
-  object-fit: contain; 
-  display: block; 
-  margin: 0 auto; 
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
 }
 
 .splash-logo-placeholder {
@@ -95,6 +124,7 @@ export default defineComponent({
   gap: 20px;
   width: 100%;
   max-width: 300px;
+  /* Garante que o botão de limpar pontos siga o espaçamento */
 }
 
 .menu-button {
@@ -121,5 +151,14 @@ export default defineComponent({
 
 .menu-button.primary:hover {
   background-color: #27ae60;
+}
+
+/* NOVO: Estilos para o botão Limpar Pontos, reusando a classe .menu-button */
+.menu-button.clear-scores-button {
+  background-color: #e74c3c; /* Um vermelho para indicar ação de limpar/resetar */
+}
+
+.menu-button.clear-scores-button:hover {
+  background-color: #c0392b;
 }
 </style>

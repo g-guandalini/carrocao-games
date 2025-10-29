@@ -66,7 +66,7 @@ import ImageTiler from './ImageTiler.vue';
 import ToastNotification from './ToastNotification.vue';
 import AnswerFeedback from './AnswerFeedback.vue';
 import { Character, GameStatus, TeamColor } from '../types';
-import { proceedToReveal } from '../store/gameStore';
+import { proceedToReveal } from '../store/imagemOcultaStore';
 
 export default defineComponent({
   name: 'GameImagemOculta',

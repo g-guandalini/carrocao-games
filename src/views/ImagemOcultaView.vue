@@ -32,7 +32,7 @@
   import { defineComponent, onMounted, onUnmounted } from 'vue';
   // ATUALIZADO: Importando da nova store com o nome correto
   import { imagemOcultaStore, startNewRound as startNewRoundInStore, selectTeam, handleOperatorFeedback as handleOperatorFeedbackInStore, resetGameScores, viewScoreboard } from '../store/imagemOcultaStore';
-  import { TeamColor, GameStatus } from '../types';
+  import { TeamColor } from '../types';
   
   import GameHeader from '../components/GameHeader.vue';
   import GameImagemOculta from '../components/GameImagemOculta.vue';

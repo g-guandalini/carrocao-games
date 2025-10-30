@@ -1,14 +1,21 @@
 <template>
   <div class="splash-screen-wrapper">
+    <!-- Botão de Administração no canto superior direito -->
+    <button class="admin-button" @click="navigateToAdmin" title="Acessar Painel Admin">
+      <!-- Ícone de engrenagem SVG -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="gear-icon">
+        <path d="M12 21c-1.104 0-2-.896-2-2v-3.076a8.03 8.03 0 01-2.924-2.115L3.385 15.615l-1.414-1.414 2.828-2.828a8.03 8.03 0 01-2.115-2.924L2 10c0-1.104.896-2 2-2h3.076a8.03 8.03 0 012.115-2.924L8.385 3.385l1.414-1.414 2.828 2.828a8.03 8.03 0 012.924-2.115L14 2c1.104 0 2 .896 2 2v3.076a8.03 8.03 0 012.924 2.115L20.615 8.385l1.414 1.414-2.828 2.828a8.03 8.03 0 012.115 2.924L22 16c0 1.104-.896 2-2 2h-3.076a8.03 8.03 0 01-2.115 2.924L15.615 20.615l-1.414 1.414-2.828-2.828A8.03 8.03 0 0112 21zM12 18a6 6 0 100-12 6 6 0 000 12zM12 16a4 4 0 110-8 4 4 0 010 8z" />
+      </svg>
+    </button>
+
     <div class="splash-header-content">
       <div class="splash-logo-area">
-        <!-- Se você tiver uma imagem de logo, substitua o span: -->
         <img src="/logo_sitio.png" alt="Carroção Games Logo" class="splash-logo-img">
       </div>
     </div>
 
     <div class="menu-options">
-      <button class="menu-button primary" @click="$emit('start-game')">
+      <button class="menu-button primary" @click="navigateToImagemOcultaGame">
         Imagem Oculta
       </button>
       <button class="menu-button" @click="$emit('select-connection')">
@@ -18,7 +25,6 @@
         Bug
       </button>
 
-      <!-- NOVO: Botão "Limpar Pontos" -->
       <button v-if="hasScoresToClear" class="menu-button clear-scores-button" @click="clearAllScores">
         Limpar Pontos
       </button>
@@ -28,35 +34,42 @@
 
 <script lang="ts">
 import { defineComponent, computed } from 'vue';
-// Importar a store e a função de reset de pontos
-import { imagemOcultaStore, resetGameScores } from '../store/imagemOcultaStore';
+import { scoreStore, resetScores } from '../store/scoreStore';
+import { useRouter } from 'vue-router'; // Importe useRouter
 
 export default defineComponent({
   name: 'SplashScreen',
-  emits: ['start-game', 'select-connection', 'select-bug'],
+  emits: ['select-connection', 'select-bug'],
   setup() {
-    // Computa se alguma equipe tem pontuação maior que zero
+    const router = useRouter();
+
     const hasScoresToClear = computed(() => {
-      // Verifica se a store já carregou os scores.
-      // Se ainda estiver carregando, consideramos que não há scores para limpar
-      // para evitar um botão piscando ou decisões com dados antigos.
-      if (imagemOcultaStore.isLoadingScores) {
+      if (scoreStore.isLoadingScores) {
         return false;
       }
-      // Itera sobre as pontuações e verifica se alguma é maior que 0
-      return Object.values(imagemOcultaStore.score).some(score => score > 0);
+      return Object.values(scoreStore.score).some(score => score > 0);
     });
 
-    // Função para limpar todas as pontuações
     const clearAllScores = async () => {
       if (confirm('Tem certeza que deseja limpar todas as pontuações? Esta ação não pode ser desfeita.')) {
-        await resetGameScores(); // Chama a função de reset do store
+        await resetScores();
       }
+    };
+
+    const navigateToImagemOcultaGame = () => {
+      router.push({ name: 'ImagemOcultaGame' });
+    };
+
+    // NOVO MÉTODO: Para navegar para a rota administrativa
+    const navigateToAdmin = () => {
+      router.push({ name: 'AdminDefaultRedirect' }); // Ou { path: '/admin' }
     };
 
     return {
       hasScoresToClear,
       clearAllScores,
+      navigateToImagemOcultaGame,
+      navigateToAdmin, // Expõe o novo método para o template
     };
   },
 });
@@ -69,7 +82,41 @@ export default defineComponent({
   align-items: center;
   width: 100%;
   max-width: 800px;
+  min-height: 100vh;
+  justify-content: center;
+  background-color: #f0f2f5;
+  position: relative; /* Adicione esta linha para permitir posicionamento absoluto de filhos */
+  padding-top: 60px; /* Adicione padding para o botão admin não sobrepor conteúdo */
 }
+
+/* NOVO ESTILO PARA O BOTÃO ADMIN */
+.admin-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+  color: #555; /* Cor padrão do ícone */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #3498db; /* Cor ao passar o mouse */
+}
+
+.admin-button .gear-icon {
+  width: 30px; /* Tamanho do ícone */
+  height: 30px;
+  fill: currentColor; /* Faz o SVG usar a cor definida pelo 'color' do botão */
+}
+
 
 .splash-header-content {
   text-align: center;
@@ -95,7 +142,6 @@ export default defineComponent({
   background-color: transparent;
 }
 
-/* NOVO CSS PARA A IMAGEM DENTRO DA ÁREA DO LOGO */
 .splash-logo-area .splash-logo-img {
   max-width: 100%;
   max-height: 100%;
@@ -109,7 +155,6 @@ export default defineComponent({
   color: #3498db;
 }
 
-/* --- Estilos do Menu Principal --- */
 .instruction-text {
   margin-bottom: 25px;
   font-size: 1.1em;
@@ -124,7 +169,7 @@ export default defineComponent({
   gap: 20px;
   width: 100%;
   max-width: 300px;
-  /* Garante que o botão de limpar pontos siga o espaçamento */
+  margin-top: 40px;
 }
 
 .menu-button {
@@ -153,9 +198,8 @@ export default defineComponent({
   background-color: #27ae60;
 }
 
-/* NOVO: Estilos para o botão Limpar Pontos, reusando a classe .menu-button */
 .menu-button.clear-scores-button {
-  background-color: #e74c3c; /* Um vermelho para indicar ação de limpar/resetar */
+  background-color: #e74c3c;
 }
 
 .menu-button.clear-scores-button:hover {

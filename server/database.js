@@ -1,7 +1,7 @@
 // server/database.js
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const fs = require('fs'); // Importar o módulo 'fs' para criar diretório
+const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, 'db', 'game.db');
 
@@ -78,6 +78,7 @@ async function createTables() {
         );
     `;
 
+    // A FOREIGN KEY CASCADE DELETE é importante aqui para o CRUD
     const createCategoryImagemOcultaTable = `
         CREATE TABLE IF NOT EXISTS category_imagem_oculta (
             category_id INTEGER NOT NULL,
@@ -88,11 +89,10 @@ async function createTables() {
         );
     `;
 
-    // NOVA TABELA DE SCORES
     const createScoresTable = `
         CREATE TABLE IF NOT EXISTS scores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            team TEXT UNIQUE NOT NULL, -- 'Azul', 'Vermelho', 'Verde', 'Amarelo'
+            team TEXT UNIQUE NOT NULL,
             points INTEGER NOT NULL DEFAULT 0
         );
     `;
@@ -107,11 +107,11 @@ async function createTables() {
                 if (err) return reject(err);
                 console.log('Tabela "imagem_oculta" criada ou já existe.');
             });
-            db.run(createCategoryImagemOcultaTable, (err) => {
+            db.run(createCategoryImagemOcultaTable, (err) => { // Cria a tabela de relacionamento
                 if (err) return reject(err);
                 console.log('Tabela "category_imagem_oculta" criada ou já existe.');
             });
-            db.run(createScoresTable, (err) => { // Cria a nova tabela de scores
+            db.run(createScoresTable, (err) => {
                 if (err) return reject(err);
                 console.log('Tabela "scores" criada ou já existe.');
                 resolve();
@@ -124,25 +124,52 @@ async function createTables() {
  * Popula o banco de dados com os dados iniciais se as tabelas estiverem vazias.
  */
 async function seedInitialData() {
+    // Categorias iniciais para teste
+    const initialCategories = ['Personagens', 'Animais', 'Objetos', 'Comida'];
+    const categoryCountRow = await getAsync("SELECT COUNT(*) AS count FROM categories");
+    if (categoryCountRow.count === 0) {
+        console.log('Populando "categories" com dados iniciais...');
+        for (const catName of initialCategories) {
+            await runAsync("INSERT INTO categories (name) VALUES (?)", [catName]);
+        }
+        console.log('Dados iniciais de categories inseridos com sucesso.');
+    } else {
+        console.log('Tabela "categories" já contém dados. Ignorando seeding.');
+    }
+
+    // Personagens iniciais
     const ALL_CHARACTERS = [
-        { id: '1', name: 'Mickey Mouse', imageUrl: '/characters/mickey.png', hint: 'Um famoso rato falante de desenhos animados.' },
-        { id: '2', name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png', hint: 'Um herói que escala paredes e solta teias.' },
-        { id: '3', name: 'Pikachu', imageUrl: '/characters/pikachu.png', hint: 'Um monstrinho amarelo que libera choques elétricos.' },
-        { id: '4', name: 'Goku', imageUrl: '/characters/goku.png', hint: 'Um guerreiro alienígena com cabelo espetado que adora lutar.' },
-        { id: '5', name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png', hint: 'Um bilionário que usa uma armadura de alta tecnologia.' },
-        { id: '6', name: 'Batman', imageUrl: '/characters/batman.png', hint: 'O Cavaleiro das Trevas que protege Gotham City.' },
-        { id: '7', name: 'Capitão America', imageUrl: '/characters/capitao_america.png', hint: 'Um super-soldado com um escudo patriótico.' },
-        { id: '8', name: 'Mulher Maravilha', imageUrl: '/characters/mulher_maravilha.png', hint: 'Uma princesa amazona com um laço mágico.' },
+        { name: 'Mickey Mouse', imageUrl: '/characters/mickey.png', hint: 'Um famoso rato falante de desenhos animados.', categoryNames: ['Personagens', 'Animais'] },
+        { name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png', hint: 'Um herói que escala paredes e solta teias.', categoryNames: ['Personagens'] },
+        { name: 'Pikachu', imageUrl: '/characters/pikachu.png', hint: 'Um monstrinho amarelo que libera choques elétricos.', categoryNames: ['Personagens', 'Animais'] },
+        { name: 'Goku', imageUrl: '/characters/goku.png', hint: 'Um guerreiro alienígena com cabelo espetado que adora lutar.', categoryNames: ['Personagens'] },
+        { name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png', hint: 'Um bilionário que usa uma armadura de alta tecnologia.', categoryNames: ['Personagens', 'Objetos'] },
+        { name: 'Batman', imageUrl: '/characters/batman.png', hint: 'O Cavaleiro das Trevas que protege Gotham City.', categoryNames: ['Personagens'] },
+        { name: 'Capitão America', imageUrl: '/characters/capitao_america.png', hint: 'Um super-soldado com um escudo patriótico.', categoryNames: ['Personagens'] },
+        { name: 'Mulher Maravilha', imageUrl: '/characters/mulher_maravilha.png', hint: 'Uma princesa amazona com um laço mágico.', categoryNames: ['Personagens'] },
     ];
 
-    // Seed para imagem_oculta
+    // Seed para imagem_oculta e category_imagem_oculta
     const charCountRow = await getAsync("SELECT COUNT(*) AS count FROM imagem_oculta");
     if (charCountRow.count === 0) {
         console.log('Populando "imagem_oculta" com dados iniciais...');
+        const existingCategories = await allAsync("SELECT id, name FROM categories");
+        const categoryMap = new Map(existingCategories.map(cat => [cat.name, cat.id]));
+
         for (const char of ALL_CHARACTERS) {
-            await runAsync("INSERT INTO imagem_oculta (hint, answer, imageUrl) VALUES (?, ?, ?)", [char.hint, char.name, char.imageUrl]);
+            const result = await runAsync("INSERT INTO imagem_oculta (hint, answer, imageUrl) VALUES (?, ?, ?)", [char.hint, char.name, char.imageUrl]);
+            const imagemOcultaId = result.lastID;
+
+            for (const catName of char.categoryNames) {
+                const categoryId = categoryMap.get(catName);
+                if (categoryId) {
+                    await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, imagemOcultaId]);
+                } else {
+                    console.warn(`Categoria '${catName}' não encontrada para o personagem '${char.name}'.`);
+                }
+            }
         }
-        console.log('Dados iniciais de imagem_oculta inseridos com sucesso.');
+        console.log('Dados iniciais de imagem_oculta e associações inseridos com sucesso.');
     } else {
         console.log('Tabela "imagem_oculta" já contém dados. Ignorando seeding.');
     }
@@ -151,7 +178,7 @@ async function seedInitialData() {
     const scoreCountRow = await getAsync("SELECT COUNT(*) AS count FROM scores");
     if (scoreCountRow.count === 0) {
         console.log('Populando "scores" com dados iniciais (0 para cada time)...');
-        const initialTeams = ['Azul', 'Vermelho', 'Verde', 'Amarelo']; // Correspondendo ao enum TeamColor
+        const initialTeams = ['Azul', 'Vermelho', 'Verde', 'Amarelo'];
         for (const team of initialTeams) {
             await runAsync("INSERT INTO scores (team, points) VALUES (?, ?)", [team, 0]);
         }
@@ -186,8 +213,8 @@ async function initializeDatabase() {
 // Exporta as funções e as auxiliares
 module.exports = {
     initializeDatabase,
-    getDb: () => db, // Para acessar a instância do db após a inicialização
-    runAsync, // Exportar para uso em outras partes do backend se necessário
+    getDb: () => db,
+    runAsync,
     getAsync,
     allAsync
 };

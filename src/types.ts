@@ -24,6 +24,7 @@ export interface Character {
   name: string; // Corresponde a 'answer' no backend
   imageUrl: string;
   hint: string;
+  order_idx?: number | null;
 }
 
 // NOVA INTERFACE: Para uma Categoria
@@ -57,6 +58,7 @@ export interface GameState {
   activeTeam: TeamColor | null;
   characters: Character[];
   isLoadingCharacters: boolean;
+  playedCharacterIds: string[]
 }
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';

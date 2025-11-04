@@ -35,7 +35,8 @@
 <script lang="ts">
 import { defineComponent, computed } from 'vue';
 import { scoreStore, resetScores } from '../store/scoreStore';
-import { useRouter } from 'vue-router'; // Importe useRouter
+import { resetGameScores as resetImagemOcultaGameScores } from '../store/imagemOcultaStore'; // IMPORTANTE: Importar a função de reset do jogo Imagem Oculta
+import { useRouter } from 'vue-router'; 
 
 export default defineComponent({
   name: 'SplashScreen',
@@ -56,26 +57,28 @@ export default defineComponent({
       }
     };
 
-    const navigateToImagemOcultaGame = () => {
+    const navigateToImagemOcultaGame = async () => { // Adicionado 'async'
+      console.log('[SplashScreen] Clicou em Imagem Oculta. Resetando estado do jogo...');
+      await resetImagemOcultaGameScores(); // Chame a função para resetar o jogo Imagem Oculta
       router.push({ name: 'ImagemOcultaGame' });
     };
 
-    // NOVO MÉTODO: Para navegar para a rota administrativa
     const navigateToAdmin = () => {
-      router.push({ name: 'AdminDefaultRedirect' }); // Ou { path: '/admin' }
+      router.push({ name: 'AdminDefaultRedirect' }); 
     };
 
     return {
       hasScoresToClear,
       clearAllScores,
       navigateToImagemOcultaGame,
-      navigateToAdmin, // Expõe o novo método para o template
+      navigateToAdmin,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Seu CSS existente do SplashScreen */
 .splash-screen-wrapper {
   display: flex;
   flex-direction: column;
@@ -85,11 +88,10 @@ export default defineComponent({
   min-height: 100vh;
   justify-content: center;
   background-color: #f0f2f5;
-  position: relative; /* Adicione esta linha para permitir posicionamento absoluto de filhos */
-  padding-top: 60px; /* Adicione padding para o botão admin não sobrepor conteúdo */
+  position: relative; 
+  padding-top: 60px; 
 }
 
-/* NOVO ESTILO PARA O BOTÃO ADMIN */
 .admin-button {
   position: absolute;
   top: 20px;
@@ -100,7 +102,7 @@ export default defineComponent({
   padding: 8px;
   border-radius: 50%;
   transition: background-color 0.3s ease;
-  color: #555; /* Cor padrão do ícone */
+  color: #555; 
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,13 +110,13 @@ export default defineComponent({
 
 .admin-button:hover {
   background-color: rgba(0, 0, 0, 0.05);
-  color: #3498db; /* Cor ao passar o mouse */
+  color: #3498db; 
 }
 
 .admin-button .gear-icon {
-  width: 30px; /* Tamanho do ícone */
+  width: 30px; 
   height: 30px;
-  fill: currentColor; /* Faz o SVG usar a cor definida pelo 'color' do botão */
+  fill: currentColor; 
 }
 
 

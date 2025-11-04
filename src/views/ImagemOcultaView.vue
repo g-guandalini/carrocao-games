@@ -16,20 +16,32 @@
     <ScoreboardScreen
       v-else-if="imagemOcultaStore.gameStatus === 'scoreboard'"
       :game-status="imagemOcultaStore.gameStatus"
-      @next-round="startNewRound"
+      @next-round="handleNextRoundFromScoreboard"
       @reset-game="handleResetGame"
     />
 
-    <p v-else-if="imagemOcultaStore.gameStatus !== 'idle' && !imagemOcultaStore.currentRoundCharacter" class="loading-message">
-      Carregando personagem...
+    <p v-else-if="imagemOcultaStore.gameStatus === 'idle' && !imagemOcultaStore.currentRoundCharacter && !imagemOcultaStore.isLoadingCharacters" class="loading-message">
+      Aguardando início do jogo...
+    </p>
+     <p v-else-if="imagemOcultaStore.isLoadingCharacters" class="loading-message">
+      Carregando personagens...
     </p>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted, onUnmounted } from 'vue';
-import { imagemOcultaStore, startNewRound as startNewRoundInStore, selectTeam, handleOperatorFeedback as handleOperatorFeedbackInStore, resetGameScores, viewScoreboard } from '../store/imagemOcultaStore';
-import { TeamColor } from '../types';
+// IMPORT ATUALIZADO: Importe initializeGame e startNextGameRound (os novos nomes)
+import { 
+  imagemOcultaStore, 
+  initializeGame, // Chamada para montagem inicial
+  startNextGameRound, // Chamada para o botão "Próxima Rodada"
+  selectTeam, 
+  handleOperatorFeedback as handleOperatorFeedbackInStore, 
+  resetGameScores, 
+  viewScoreboard 
+} from '../store/imagemOcultaStore';
+import { TeamColor } from '../types'; // Certifique-se que TeamColor está definido e importado corretamente
 import { useRouter } from 'vue-router'; 
 
 import GameHeader from '../components/GameHeader.vue';
@@ -46,48 +58,58 @@ export default defineComponent({
   setup() {
     const router = useRouter(); 
 
+    // Mapeia o feedback do operador para a função do store
     const handleOperatorFeedback = (isCorrect: boolean, scoreAwarded: number) => {
       console.log(`[ImagemOcultaView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
       handleOperatorFeedbackInStore(isCorrect, scoreAwarded);
     };
 
+    // Lógica para seleção de time via teclado
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      // Verifica se o estado atual do jogo permite seleção de time
       if (imagemOcultaStore.gameStatus === 'revealing') {
         let selectedTeam: TeamColor | null = null;
+        // Ajuste TeamColor para o tipo correto se necessário, ex: TeamColor.Azul
+        // Exemplo: if (event.key === '1') selectedTeam = 'Azul';
+        // É importante que 'TeamColor' seja um enum ou tipo literal que corresponda aos valores
+        // Como você tem `TeamColor.BLUE`, etc, estou supondo que TeamColor é um enum.
+        // Se for um tipo literal, você precisará ajustar o switch case para strings literais ('Azul', 'Vermelho', etc.)
         switch (event.key) {
-          case '1': selectedTeam = TeamColor.BLUE; break;
-          case '2': selectedTeam = TeamColor.RED; break;
-          case '3': selectedTeam = TeamColor.GREEN; break;
-          case '4': selectedTeam = TeamColor.YELLOW; break;
+          case '1': selectedTeam = 'Azul'; break;
+          case '2': selectedTeam = 'Vermelho'; break;
+          case '3': selectedTeam = 'Verde'; break;
+          case '4': selectedTeam = 'Amarelo'; break;
         }
 
         if (selectedTeam) {
-          event.preventDefault(); // Previne o comportamento padrão (ex: scroll)
+          event.preventDefault(); 
           selectTeam(selectedTeam);
         }
       }
     };
 
+    // Mapeia a ação de ver placar para a função do store
     const viewScoreboardFromGame = () => {
       viewScoreboard();
     };
     
-    const startNewRound = () => {
-      startNewRoundInStore();
+    // NOVO: Função para o botão "Próxima Rodada" do ScoreboardScreen
+    const handleNextRoundFromScoreboard = () => {
+      console.log('[ImagemOcultaView] handleNextRoundFromScoreboard: Chamando startNextGameRound()...');
+      startNextGameRound(); // Esta função sempre inicia uma rodada limpa
     };
 
+    // Mapeia a ação de resetar jogo para a função do store
     const handleResetGame = () => {
+      console.log('[ImagemOcultaView] handleResetGame: Chamando resetGameScores()...');
       resetGameScores(); 
-      router.push({ name: 'Home' }); 
+      router.push({ name: 'Home' }); // Volta para a tela inicial
     };
 
     onMounted(() => {
       document.addEventListener('keydown', handleGlobalKeyDown);
-      // Inicia uma nova rodada se o jogo estiver em estado inicial ou após visualização do placar
-      if (imagemOcultaStore.gameStatus === 'idle' || imagemOcultaStore.gameStatus === 'scoreboard') {
-        startNewRound();
-      }
+      console.log('[ImagemOcultaView] onMounted: Chamando initializeGame()...');
+      // A função initializeGame() do store é responsável por restaurar uma rodada ou iniciar uma nova.
+      initializeGame(); 
     });
 
     onUnmounted(() => {
@@ -96,7 +118,7 @@ export default defineComponent({
 
     return {
       imagemOcultaStore,
-      startNewRound,
+      handleNextRoundFromScoreboard, // Exponha a nova função para o template
       handleOperatorFeedback,
       viewScoreboardFromGame,
       handleResetGame,

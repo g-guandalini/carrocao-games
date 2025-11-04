@@ -61,10 +61,8 @@ export async function updateScore(team: TeamColor, pointsToAdd: number) {
 
     // Atualiza o frontend após sucesso da API
     scoreStore.score[team] += pointsToAdd;
-    addToast(`🎉 Pontos atualizados para a equipe ${team}!`, 'success');
   } catch (error) {
     console.error('Falha ao atualizar pontuação no backend:', error);
-    addToast('Erro ao salvar pontuação no servidor! Tente novamente.', 'error');
   }
 }
 
@@ -82,7 +80,6 @@ export async function resetScores() {
       throw new Error(`Erro HTTP ao resetar pontuações: ${response.status}`);
     }
     // const result = await response.json(); // Se precisar do feedback do servidor
-    addToast('Pontuações resetadas no servidor!', 'info');
 
     // Reset frontend state only after successful backend reset
     scoreStore.score = { ...initialScoreState.score }; // Zera os scores locais

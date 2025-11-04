@@ -31,11 +31,17 @@ const routes: Array<RouteRecordRaw> = [
         path: 'categories',
         name: 'AdminCategories',
         component: CategoryManagement,
+        meta: {
+            title: 'Gerenciar Categorias' 
+        }
       },
       {
         path: 'imagem-oculta',
         name: 'AdminImagemOculta',
         component: ImagemOcultaManagement,
+        meta: {
+            title: 'Gerenciar Imagem Oculta' 
+        }
       },
     ],
   },

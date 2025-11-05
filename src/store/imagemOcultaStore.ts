@@ -1,25 +1,26 @@
 // src/store/imagemOcultaStore.ts
 import { reactive, watch } from 'vue';
-import { GameState, TeamColor, Character, GameStatus } from '../types';
+import { GameState, TeamColor, Character, GameStatus, Category } from '../types'; 
 import { addToast } from './toastStore';
 import { scoreStore, fetchScores, updateScore, resetScores } from './scoreStore';
 
-const API_BASE_URL = 'http://localhost:3001'; // A URL do seu backend
+const API_BASE_URL = 'http://localhost:3001';
 const LOCAL_STORAGE_PLAYED_CHARS_KEY = 'imagemOcultaGamePlayedChars';
 const LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY = 'imagemOcultaCurrentRoundState';
+const LOCAL_STORAGE_SELECTED_CATEGORIES_KEY = 'imagemOcultaSelectedCategories';
 
 interface SavedRoundState {
   currentRoundCharacterId: string | null;
   revealProgress: number;
   gameStatus: GameStatus;
   activeTeam: TeamColor | null;
+  selectedCategoryIds: number[]; 
 }
 
 // --- Funções auxiliares para localStorage ---
 function savePlayedCharacterIds(ids: string[]) {
   try {
     localStorage.setItem(LOCAL_STORAGE_PLAYED_CHARS_KEY, JSON.stringify(ids));
-    
   } catch (e) {
     console.error('Erro ao salvar IDs de personagens jogados no localStorage:', e);
   }
@@ -29,7 +30,6 @@ function loadPlayedCharacterIds(): string[] {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_PLAYED_CHARS_KEY);
     const ids = stored ? JSON.parse(stored) : [];
-    
     return ids;
   } catch (e) {
     console.error('Erro ao carregar IDs de personagens jogados do localStorage:', e);
@@ -37,9 +37,26 @@ function loadPlayedCharacterIds(): string[] {
   }
 }
 
+function saveSelectedCategoryIds(ids: number[]) { 
+    try {
+        localStorage.setItem(LOCAL_STORAGE_SELECTED_CATEGORIES_KEY, JSON.stringify(ids));
+    } catch (e) {
+        console.error('Erro ao salvar IDs de categorias selecionadas no localStorage:', e);
+    }
+}
+
+function loadSelectedCategoryIds(): number[] { 
+    try {
+        const stored = localStorage.getItem(LOCAL_STORAGE_SELECTED_CATEGORIES_KEY);
+        const ids = stored ? JSON.parse(stored) : [];
+        return ids.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    } catch (e) {
+        console.error('Erro ao carregar IDs de categorias selecionadas do localStorage:', e);
+        return [];
+    }
+}
+
 function saveCurrentRoundStateToLocalStorage() {
-  // Só salva se houver um currentRoundCharacter e o gameStatus NÃO for 'finished' ou 'idle'
-  // Pois 'finished' e 'idle' indicam que a rodada não está mais "ativa" ou "em andamento" para ser restaurada.
   if (imagemOcultaStore.currentRoundCharacter && 
       imagemOcultaStore.gameStatus !== 'finished' && 
       imagemOcultaStore.gameStatus !== 'idle') { 
@@ -48,15 +65,14 @@ function saveCurrentRoundStateToLocalStorage() {
       revealProgress: imagemOcultaStore.revealProgress,
       gameStatus: imagemOcultaStore.gameStatus,
       activeTeam: imagemOcultaStore.activeTeam,
+      selectedCategoryIds: imagemOcultaStore.selectedCategoryIds,
     };
     try {
       localStorage.setItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY, JSON.stringify(stateToSave));
-      
     } catch (e) {
       console.error('Erro ao salvar estado da rodada atual no localStorage:', e);
     }
   } else {
-    // Se não deve ser salvo, garante que seja limpo para evitar estados inconsistentes.
     clearCurrentRoundStateFromLocalStorage();
   }
 }
@@ -65,7 +81,9 @@ function loadCurrentRoundStateFromLocalStorage(): SavedRoundState | null {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY);
     const state = stored ? JSON.parse(stored) : null;
-    
+    if (state && state.selectedCategoryIds) {
+        state.selectedCategoryIds = state.selectedCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    }
     return state;
   } catch (e) {
     console.error('Erro ao carregar estado da rodada atual do localStorage:', e);
@@ -76,7 +94,6 @@ function loadCurrentRoundStateFromLocalStorage(): SavedRoundState | null {
 function clearCurrentRoundStateFromLocalStorage() {
   try {
     localStorage.removeItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY);
-    
   } catch (e) {
     console.error('Erro ao limpar estado da rodada atual do localStorage:', e);
   }
@@ -95,6 +112,7 @@ const initialState: GameState = {
   characters: [],
   isLoadingCharacters: false,
   playedCharacterIds: loadPlayedCharacterIds(),
+  selectedCategoryIds: loadSelectedCategoryIds(), 
 };
 
 export const imagemOcultaStore = reactive<GameState>({ ...initialState });
@@ -105,38 +123,44 @@ const REVEAL_STEP_MS = 100;
 
 let charactersFetchPromise: Promise<void> | null = null;
 
-interface ApiCharacterResponse {
+// Interface para a resposta da API, AGORA ESPERA A ESTRUTURA COMPLETA DO BACKEND
+// Corresponde à ImagemOcultaItem[] que o backend retorna agora
+interface ApiImagemOcultaResponse { 
   id: number;
-  answer: string;
-  imageUrl: string;
   hint: string;
+  answer: string; // O backend agora retorna 'answer' diretamente
+  imageUrl: string;
   order_idx: number | null;
+  categories: Category[]; // O backend agora retorna 'categories'
 }
 
-export async function fetchCharacters(): Promise<void> {
-  
+export async function fetchCharacters(categoryIds: number[] = imagemOcultaStore.selectedCategoryIds): Promise<void> { 
   if (charactersFetchPromise) {
-    
     return charactersFetchPromise;
   }
 
   charactersFetchPromise = (async () => {
     imagemOcultaStore.isLoadingCharacters = true;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/imagem-oculta`);
+      let url = `${API_BASE_URL}/api/admin/imagem-oculta`; 
+      if (categoryIds && categoryIds.length > 0) {
+        url += `?categoryIds=${categoryIds.join(',')}`;
+      }
+
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Erro HTTP: ${response.status}`);
       }
-      const data: ApiCharacterResponse[] = await response.json();
+      const data: ApiImagemOcultaResponse[] = await response.json(); // Usa a interface completa
       
-      imagemOcultaStore.characters = data.map(char => ({
-        id: String(char.id),
-        name: char.answer,
-        imageUrl: char.imageUrl,
-        hint: char.hint,
-        order_idx: char.order_idx,
+      // Mapeia da ApiImagemOcultaResponse para a interface Character do jogo
+      imagemOcultaStore.characters = data.map(item => ({
+        id: String(item.id), // ID do Character é string
+        name: item.answer,   // Mapeia 'answer' da API para 'name' no Character
+        imageUrl: item.imageUrl,
+        hint: item.hint,
+        order_idx: item.order_idx,
       }));
-      
       
     } catch (error) {
       console.error('[FetchCharacters] Falha ao buscar personagens:', error);
@@ -145,65 +169,61 @@ export async function fetchCharacters(): Promise<void> {
     } finally {
       imagemOcultaStore.isLoadingCharacters = false;
       charactersFetchPromise = null;
-      
     }
   })();
 
   return charactersFetchPromise;
 }
 
-function pickNextCharacterId(): string | null {
+export function setSelectedCategories(ids: number[]) { 
+    imagemOcultaStore.selectedCategoryIds = ids;
+    saveSelectedCategoryIds(ids);
+    imagemOcultaStore.playedCharacterIds = [];
+    savePlayedCharacterIds([]);
+}
 
+function pickNextCharacterId(): string | null {
   let availableCharacters = imagemOcultaStore.characters.filter(
     (char) => !imagemOcultaStore.playedCharacterIds.includes(char.id)
   );
   
-
   if (availableCharacters.length === 0) {
     imagemOcultaStore.playedCharacterIds = [];
     savePlayedCharacterIds([]);
-    availableCharacters = imagemOcultaStore.characters;
-    
+    availableCharacters = imagemOcultaStore.characters; 
+    addToast('Todas as imagens das categorias selecionadas foram jogadas. Reiniciando a lista para novas rodadas.', 'info');
   }
 
   const orderedAvailable = availableCharacters
     .filter(char => char.order_idx !== null && char.order_idx !== undefined)
-    .sort((a, b) => a.order_idx! - b.order_idx!);
+    .sort((a, b) => (a.order_idx || Infinity) - (b.order_idx || Infinity)); 
   
-
   if (orderedAvailable.length > 0) {
-    
     return orderedAvailable[0].id;
   }
 
   const unorderedAvailable = availableCharacters
     .filter(char => char.order_idx === null || char.order_idx === undefined);
   
-
   if (unorderedAvailable.length > 0) {
     const randomIndex = Math.floor(Math.random() * unorderedAvailable.length);
-    
     return unorderedAvailable[randomIndex].id;
   }
 
-  addToast('Nenhum personagem disponível para o jogo, mesmo após tentar reiniciar.', 'error');
-  
+  addToast('Nenhum personagem disponível para o jogo nas categorias selecionadas.', 'error');
   return null;
 }
 
-/** Inicia uma rodada completamente nova, limpando qualquer estado anterior. */
 async function startNewCleanRound() {
-  
   stopReveal();
-  Object.assign(imagemOcultaStore, initialRoundStateDefaults()); // Reseta o estado da rodada na store
-  clearCurrentRoundStateFromLocalStorage(); // Garante que o localStorage esteja limpo
+  Object.assign(imagemOcultaStore, initialRoundStateDefaults());
+  clearCurrentRoundStateFromLocalStorage();
 
-  await fetchCharacters();
+  await fetchCharacters(); 
 
   if (imagemOcultaStore.characters.length === 0) {
-    addToast('Não foi possível iniciar a rodada: nenhum personagem carregado. Verifique o servidor!', 'error');
+    addToast('Não foi possível iniciar a rodada: nenhum personagem carregado com as categorias selecionadas. Verifique as categorias ou o servidor!', 'error');
     imagemOcultaStore.gameStatus = 'idle';
-    
     return;
   }
 
@@ -213,84 +233,62 @@ async function startNewCleanRound() {
     if (nextCharacter) {
       imagemOcultaStore.currentRoundCharacter = nextCharacter;
       imagemOcultaStore.gameStatus = 'hint';
-      saveCurrentRoundStateToLocalStorage(); // Salva o estado inicial da nova rodada
-      
+      saveCurrentRoundStateToLocalStorage();
     } else {
       addToast('Erro interno: Personagem escolhido não encontrado na lista (após seleção de ID).', 'error');
       imagemOcultaStore.gameStatus = 'idle';
       clearCurrentRoundStateFromLocalStorage();
-      
     }
   } else {
-    addToast('Não foi possível selecionar um personagem para a rodada.', 'error');
+    addToast('Não foi possível selecionar um personagem para a rodada com as categorias atuais.', 'error');
     imagemOcultaStore.gameStatus = 'idle';
     clearCurrentRoundStateFromLocalStorage();
-    
   }
-  
 }
 
-/**
- * Funçao chamada no onMounted do GameView.vue para inicializar o jogo
- * ou restaurar uma rodada em andamento.
- */
 export async function initializeGame() {
-  
-  await fetchCharacters(); // Garanta que a lista de personagens está carregada
+  await fetchCharacters();
 
-  // Sempre busca as pontuações atualizadas
   if (!scoreStore.isLoadingScores) {
     await fetchScores(); 
   }
 
   const savedRoundState = loadCurrentRoundStateFromLocalStorage();
   
+  const areCategoriesTheSame = savedRoundState && 
+                               savedRoundState.selectedCategoryIds.length === imagemOcultaStore.selectedCategoryIds.length &&
+                               savedRoundState.selectedCategoryIds.every((id, index) => id === imagemOcultaStore.selectedCategoryIds[index]);
 
-  // Tenta restaurar a rodada anterior APENAS se houver um estado salvo e a rodada não estava 'finished'
-  // Nota: o 'scoreboard' também é um estado de finalização para fins de restauração aqui.
   if (savedRoundState && savedRoundState.currentRoundCharacterId && 
-      savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle') { // Adicionado 'idle' aqui
+      savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle' &&
+      areCategoriesTheSame
+      ) {
     const prevChar = imagemOcultaStore.characters.find(char => char.id === savedRoundState.currentRoundCharacterId);
     if (prevChar) {
       imagemOcultaStore.currentRoundCharacter = prevChar;
       imagemOcultaStore.revealProgress = savedRoundState.revealProgress;
       imagemOcultaStore.gameStatus = savedRoundState.gameStatus;
       imagemOcultaStore.activeTeam = savedRoundState.activeTeam;
-      
 
       if (imagemOcultaStore.gameStatus === 'revealing') {
-        
         proceedToReveal();
       }
     } else {
       clearCurrentRoundStateFromLocalStorage(); 
-      
       await startNewCleanRound();
     }
   } else {
-    
-    await startNewCleanRound(); // Inicia uma rodada limpa se não há o que restaurar
+    await startNewCleanRound(); 
   }
-  
 }
 
-
-/**
- * Função para iniciar a PRÓXIMA rodada (clique do usuário).
- * SEMPRE inicia uma rodada nova e limpa.
- */
 export async function startNextGameRound() {
-  
-  await startNewCleanRound(); // Sempre chama a lógica de rodada limpa
-  
+  await startNewCleanRound();
 }
-
 
 export function proceedToReveal() {
-  
   if (!imagemOcultaStore.currentRoundCharacter) {
     addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error');
-    console.error('--- [ProceedToReveal] ERRO: currentRoundCharacter é null. ---');
     return;
   }
   stopReveal(); 
@@ -301,17 +299,15 @@ export function proceedToReveal() {
   revealInterval = setInterval(() => {
     const elapsedTime = Date.now() - startTime;
     imagemOcultaStore.revealProgress = Math.min(elapsedTime / REVEAL_DURATION_MS, 1);
-    saveCurrentRoundStateToLocalStorage(); // Salva o progresso a cada passo
+    saveCurrentRoundStateToLocalStorage();
 
     if (imagemOcultaStore.revealProgress >= 1) {
-      
       imagemOcultaStore.revealProgress = 1;
       stopReveal(); 
       imagemOcultaStore.gameStatus = 'finished'; 
       if (imagemOcultaStore.currentRoundCharacter) {
         imagemOcultaStore.playedCharacterIds.push(imagemOcultaStore.currentRoundCharacter.id);
         savePlayedCharacterIds(imagemOcultaStore.playedCharacterIds);
-        
       }
       clearCurrentRoundStateFromLocalStorage(); 
       addToast(`Tempo esgotado! Resposta: <strong>${imagemOcultaStore.currentRoundCharacter?.name}</strong>`, 'info');
@@ -320,16 +316,13 @@ export function proceedToReveal() {
 }
 
 export function stopReveal() {
-  
   if (revealInterval) {
     clearInterval(revealInterval);
     revealInterval = null;
   }
-  // Removido saveCurrentRoundStateToLocalStorage() aqui, pois os watchers ou chamadas explícitas cuidam disso.
 }
 
 export function selectTeam(team: TeamColor) {
-  
   if (imagemOcultaStore.gameStatus === 'revealing') {
     stopReveal(); 
     imagemOcultaStore.activeTeam = team;
@@ -342,7 +335,6 @@ export function selectTeam(team: TeamColor) {
 }
 
 export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: number) {
-  
   if (!imagemOcultaStore.activeTeam || !imagemOcultaStore.currentRoundCharacter) {
     console.warn("Feedback do operador recebido em um estado inválido ou sem time ativo.");
     return;
@@ -362,20 +354,15 @@ export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: n
   if (imagemOcultaStore.currentRoundCharacter) {
     imagemOcultaStore.playedCharacterIds.push(imagemOcultaStore.currentRoundCharacter.id);
     savePlayedCharacterIds(imagemOcultaStore.playedCharacterIds);
-    
   }
   clearCurrentRoundStateFromLocalStorage(); 
-  
 }
 
 export function viewScoreboard() {
-  
   imagemOcultaStore.gameStatus = 'scoreboard';
-  // A chamada para saveCurrentRoundStateToLocalStorage() será feita pelo watcher de gameStatus.
 }
 
 export async function resetGameScores() {
-    
     stopReveal();
     await resetScores();
     Object.assign(imagemOcultaStore, initialRoundStateDefaults());
@@ -383,34 +370,23 @@ export async function resetGameScores() {
     savePlayedCharacterIds([]);
     clearCurrentRoundStateFromLocalStorage(); 
     imagemOcultaStore.gameStatus = 'idle';
-    
 }
 
-// === Watchers para persistência (revisados) ===
-// Watchers agora são mais seletivos sobre quando salvar.
-
-// Monitora o gameStatus
+// === Watchers para persistência ===
 watch(() => imagemOcultaStore.gameStatus, (newVal, oldVal) => {
   if (newVal !== oldVal) { 
-    
-    // A decisão de salvar ou limpar está encapsulada em saveCurrentRoundStateToLocalStorage()
     saveCurrentRoundStateToLocalStorage(); 
   }
 });
 
-// Monitora o activeTeam
 watch(() => imagemOcultaStore.activeTeam, (newVal, oldVal) => {
   if (newVal !== oldVal) { 
-    
     saveCurrentRoundStateToLocalStorage();
   }
 });
 
-// Monitora o currentRoundCharacter
 watch(() => imagemOcultaStore.currentRoundCharacter, (newVal, oldVal) => {
     if (newVal !== oldVal) { 
-        
-        // A decisão de salvar ou limpar está encapsulada em saveCurrentRoundStateToLocalStorage()
         saveCurrentRoundStateToLocalStorage();
     }
 });

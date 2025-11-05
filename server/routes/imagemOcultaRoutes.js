@@ -33,10 +33,27 @@ async function formatImagemOcultaWithCategories(imagemOcultaItems) {
 }
 
 // GET todas as imagens ocultas com suas categorias, ordenadas
+// CORRIGIDO: Retorna sempre a estrutura completa com categorias
 router.get('/', async (req, res) => {
     try {
-        // Ordena primeiro por 'order_idx' (NULLs por último) e depois por 'id'
-        const imagemOculta = await allAsync("SELECT * FROM imagem_oculta ORDER BY order_idx IS NULL, order_idx ASC, id ASC");
+        let sql = "SELECT io.* FROM imagem_oculta io";
+        const params = [];
+        const categoryIdsQuery = req.query.categoryIds;
+
+        if (categoryIdsQuery) {
+            const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+            if (ids.length > 0) {
+                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")";
+                params.push(...ids);
+                sql += " GROUP BY io.id"; // Garante que cada item aparece apenas uma vez
+            }
+        }
+        
+        sql += " ORDER BY io.order_idx IS NULL, io.order_idx ASC, io.id ASC";
+
+        const imagemOculta = await allAsync(sql, params);
+        // Agora, sempre formatamos os itens com categorias para o frontend do admin.
+        // O `imagemOcultaStore` do jogo fará o mapeamento necessário.
         const formattedItems = await formatImagemOcultaWithCategories(imagemOculta);
         res.json(formattedItems);
     } catch (err) {
@@ -45,7 +62,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET imagem oculta por ID com suas categorias
+// GET imagem oculta por ID com suas categorias (mantido sem alterações)
 router.get('/:id', async (req, res) => {
     try {
         const item = await getAsync("SELECT * FROM imagem_oculta WHERE id = ?", [req.params.id]);
@@ -61,7 +78,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST criar nova imagem oculta
+// POST criar nova imagem oculta (mantido sem alterações significativas para este requisito)
 router.post('/', (req, res, next) => {
     upload.single('image')(req, res, async (err) => { // Invoca o multer e trata seus erros
         if (err) {

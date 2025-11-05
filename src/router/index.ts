@@ -5,6 +5,7 @@ import ImagemOcultaView from '../views/ImagemOcultaView.vue';
 import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import CategoryManagement from '../views/admin/CategoryManagement.vue';
 import ImagemOcultaManagement from '../views/admin/ImagemOcultaManagement.vue';
+import CategorySelectionScreen from '../components/CategorySelectionScreen.vue'; // IMPORTE AQUI
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -13,18 +14,22 @@ const routes: Array<RouteRecordRaw> = [
     component: SplashScreen,
   },
   {
+    path: '/category-selection', // NOVA ROTA
+    name: 'CategorySelection',
+    component: CategorySelectionScreen,
+  },
+  {
     path: '/imagem-oculta',
     name: 'ImagemOcultaGame',
     component: ImagemOcultaView,
   },
   {
     path: '/admin',
-    // REMOVIDO: name: 'Admin', // Remova esta linha
-    component: AdminDashboard, // Este componente será o layout base para as rotas admin
+    component: AdminDashboard,
     children: [
       {
-        path: '', // Rota padrão para /admin
-        name: 'AdminDefaultRedirect', // ADICIONE ESTE NOME
+        path: '',
+        name: 'AdminDefaultRedirect',
         redirect: { name: 'AdminCategories' }
       },
       {

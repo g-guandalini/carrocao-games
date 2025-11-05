@@ -133,14 +133,15 @@ interface Category {
   name: string;
 }
 
+// Esta interface ImagemOcultaItem deve corresponder EXATAMENTE ao que o backend retorna para /api/admin/imagem-oculta
 interface ImagemOcultaItem {
   id: number;
   hint: string;
-  answer: string;
+  answer: string; // Resposta
   imageUrl: string; // Caminho da imagem no servidor
-  order_idx?: number | null; // Adicionado: nova propriedade para ordem
-  categories: Category[]; 
-  categoryIds: number[]; 
+  order_idx?: number | null; 
+  categories: Category[]; // Array de categorias associadas
+  categoryIds: number[]; // Usado no frontend para v-model dos checkboxes
 }
 
 export default defineComponent({
@@ -153,21 +154,20 @@ export default defineComponent({
       hint: '', 
       answer: '', 
       imageUrl: '', 
-      order_idx: null, // Inicializado como null
+      order_idx: null, 
       categories: [], 
       categoryIds: [] 
     });
     const searchTerm = ref<string>(''); 
-    const showForm = ref(false); // Novo estado para controlar a visibilidade do formulário
+    const showForm = ref(false); 
 
-    // Variáveis reativas para ordenação
-    const sortColumn = ref<string>(''); // Armazena a coluna atual para ordenação (ex: 'id', 'order_idx')
-    const sortDirection = ref<'asc' | 'desc'>('asc'); // Armazena a direção da ordenação ('asc' ou 'desc')
+    const sortColumn = ref<string>(''); 
+    const sortDirection = ref<'asc' | 'desc'>('asc'); 
 
-    const selectedFile = ref<File | null>(null); // Para o arquivo sendo enviado
-    const imagePreviewUrl = ref<string | null>(null); // Para o preview local do arquivo
+    const selectedFile = ref<File | null>(null); 
+    const imagePreviewUrl = ref<string | null>(null); 
 
-    const baseURL = 'http://localhost:3001'; // Base URL para acessar as imagens estáticas
+    const baseURL = 'http://localhost:3001'; 
 
     const API_BASE_URL = 'http://localhost:3001/api/admin'; 
     const IMAGEM_OCULTA_API_URL = `${API_BASE_URL}/imagem-oculta`;
@@ -175,16 +175,20 @@ export default defineComponent({
 
     const getCleanImageUrl = (url: string | null | undefined): string => {
       if (!url) return '';
-      return url.startsWith('/public/characters/') ? url.replace('/public', '') : url;
+      // As URLs do backend virão como /characters/nome.png. Não precisam de '/public'
+      return url.startsWith('/characters/') ? url : url;
     };
 
     const fetchImagemOcultaItems = async () => {
       try {
+        // A API agora retorna ImagemOcultaItem[] diretamente, com 'answer' e 'categories'
         const response = await axios.get<ImagemOcultaItem[]>(IMAGEM_OCULTA_API_URL);
         imagemOcultaItems.value = response.data.map(item => ({
             ...item,
-            imageUrl: getCleanImageUrl(item.imageUrl),
-            categoryIds: item.categories ? item.categories.map(c => c.id) : []
+            // Certifique-se de que imageUrl está limpo, embora o backend deva enviar o formato correto
+            imageUrl: getCleanImageUrl(item.imageUrl), 
+            // Categoria IDs para v-model dos checkboxes de edição
+            categoryIds: item.categories ? item.categories.map(c => c.id) : [] 
         }));
       } catch (error) {
         console.error('Erro ao buscar imagens ocultas:', error);
@@ -259,10 +263,18 @@ export default defineComponent({
         return;
       }
 
-      if (!selectedFile.value && !editingItem.value.imageUrl && !editingItem.value.id) { // Verifica se há imagem ao adicionar item novo
-        alert('Uma imagem é obrigatória. Por favor, faça o upload de uma imagem ou selecione uma existente.');
+      // Se é um item novo (id === 0) e não há arquivo selecionado nem URL de imagem, alerta.
+      if (!editingItem.value.id && !selectedFile.value && !editingItem.value.imageUrl) { 
+        alert('Uma imagem é obrigatória para novos itens. Por favor, faça o upload de uma imagem.');
         return;
       }
+      
+      // Se estamos editando e o usuário limpou a imagem, e não tem nova imagem.
+      if (editingItem.value.id && !selectedFile.value && !editingItem.value.imageUrl) {
+        alert('A imagem é obrigatória. Por favor, faça o upload de uma nova imagem ou restaure a existente.');
+        return;
+      }
+
 
       try {
         const formData = new FormData();
@@ -273,7 +285,7 @@ export default defineComponent({
         if (editingItem.value.order_idx !== null && editingItem.value.order_idx !== undefined) {
             formData.append('order', editingItem.value.order_idx.toString());
         } else {
-            formData.append('order', ''); // Envia uma string vazia para representar null no backend
+            formData.append('order', ''); 
         }
         
         if (selectedFile.value) {
@@ -299,7 +311,7 @@ export default defineComponent({
         }
         resetForm(); 
         fetchImagemOcultaItems(); 
-        showForm.value = false; // Esconde o formulário após salvar
+        showForm.value = false; 
       } catch (error: any) {
         console.error('Erro ao salvar Imagem Oculta:', error);
         if (error.response && error.response.data && error.response.data.error) {
@@ -311,27 +323,31 @@ export default defineComponent({
     };
 
     const showAddForm = () => {
-      resetForm(); // Limpa o formulário antes de mostrar para adicionar
+      resetForm(); 
       showForm.value = true;
     };
 
     const editImagemOculta = (item: ImagemOcultaItem) => {
+      // Clona o item para não modificar o original diretamente na tabela
       editingItem.value = { 
         ...item, 
+        // A imageUrl já vem limpa do fetch, apenas garante
         imageUrl: getCleanImageUrl(item.imageUrl), 
+        // categoryIds é populado a partir do array de categories do item
         categoryIds: item.categories ? item.categories.map(c => c.id) : [] 
       };
       
+      // Limpa seleções de arquivo e preview ao editar, assume que a imagem existente será usada
       selectedFile.value = null; 
       imagePreviewUrl.value = null; 
       const fileInput = document.getElementById('imageUpload') as HTMLInputElement;
       if (fileInput) fileInput.value = ''; 
-      showForm.value = true; // Exibe o formulário ao clicar em editar
+      showForm.value = true; 
     };
 
     const cancelEdit = () => {
       resetForm();
-      showForm.value = false; // Esconde o formulário ao cancelar
+      showForm.value = false; 
     };
 
     const resetForm = () => {
@@ -340,7 +356,7 @@ export default defineComponent({
             hint: '', 
             answer: '', 
             imageUrl: '', 
-            order_idx: null, // Resetar para null
+            order_idx: null, 
             categories: [], 
             categoryIds: [] 
         };
@@ -366,10 +382,8 @@ export default defineComponent({
     // Função para alternar a ordenação
     const sortTable = (column: string) => {
         if (sortColumn.value === column) {
-            // Se a mesma coluna for clicada, inverte a direção
             sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
         } else {
-            // Se uma nova coluna for clicada, define a coluna e a direção inicial como ascendente
             sortColumn.value = column;
             sortDirection.value = 'asc';
         }
@@ -393,10 +407,10 @@ export default defineComponent({
 
     // Nova propriedade computada para ordenar os itens filtrados
     const sortedImagemOcultaItems = computed(() => {
-        const items = [...filteredImagemOcultaItems.value]; // Cria uma cópia para não mutar o array original
+        const items = [...filteredImagemOcultaItems.value]; 
 
         if (!sortColumn.value) {
-            return items; // Retorna sem ordenar se nenhuma coluna de ordenação estiver definida
+            return items; 
         }
 
         return items.sort((a, b) => {
@@ -407,15 +421,13 @@ export default defineComponent({
                 valA = a.id;
                 valB = b.id;
             } else if (sortColumn.value === 'order_idx') {
-                // Trata valores nulos/indefinidos para order_idx para que fiquem no final
                 valA = a.order_idx === null || a.order_idx === undefined ? Infinity : a.order_idx;
                 valB = b.order_idx === null || b.order_idx === undefined ? Infinity : b.order_idx;
                 
-                // Coloca itens com order_idx nulo/indefinido no final da lista
                 if (a.order_idx === null || a.order_idx === undefined) return sortDirection.value === 'asc' ? 1 : -1;
                 if (b.order_idx === null || b.order_idx === undefined) return sortDirection.value === 'asc' ? -1 : 1;
             } else {
-                return 0; // Caso a coluna não seja reconhecida para ordenação
+                return 0; 
             }
 
             if (valA < valB) {
@@ -438,9 +450,7 @@ export default defineComponent({
       availableCategories,
       editingItem,
       searchTerm, 
-      // Não exportamos mais filteredImagemOcultaItems diretamente para o v-for,
-      // mas ele ainda é usado internamente pela sortedImagemOcultaItems.
-      sortedImagemOcultaItems, // Exporta a lista já ordenada para o template
+      sortedImagemOcultaItems, 
       imagePreviewUrl,
       baseURL, 
       showForm,
@@ -453,7 +463,6 @@ export default defineComponent({
       cancelEdit,
       deleteImagemOculta,
       
-      // Exporta as variáveis e função de ordenação
       sortColumn,
       sortDirection,
       sortTable,

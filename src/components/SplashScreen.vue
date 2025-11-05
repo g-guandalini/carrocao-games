@@ -15,7 +15,7 @@
     </div>
 
     <div class="menu-options">
-      <button class="menu-button primary" @click="navigateToImagemOcultaGame">
+      <button class="menu-button primary" @click="navigateToCategorySelection"> <!-- ALTERADO AQUI -->
         Imagem Oculta
       </button>
       <button class="menu-button" @click="$emit('select-connection')">
@@ -35,7 +35,7 @@
 <script lang="ts">
 import { defineComponent, computed } from 'vue';
 import { scoreStore, resetScores } from '../store/scoreStore';
-import { resetGameScores as resetImagemOcultaGameScores } from '../store/imagemOcultaStore'; // IMPORTANTE: Importar a função de reset do jogo Imagem Oculta
+import { resetGameScores as resetImagemOcultaGameScores } from '../store/imagemOcultaStore';
 import { useRouter } from 'vue-router'; 
 
 export default defineComponent({
@@ -57,10 +57,10 @@ export default defineComponent({
       }
     };
 
-    const navigateToImagemOcultaGame = async () => { // Adicionado 'async'
-      console.log('[SplashScreen] Clicou em Imagem Oculta. Resetando estado do jogo...');
-      await resetImagemOcultaGameScores(); // Chame a função para resetar o jogo Imagem Oculta
-      router.push({ name: 'ImagemOcultaGame' });
+    const navigateToCategorySelection = async () => {
+      console.log('[SplashScreen] Clicou em Imagem Oculta. Navegando para seleção de categorias.');
+      await resetImagemOcultaGameScores(); // Reseta o estado do jogo (incluindo playedCharacterIds) antes da seleção de categoria.
+      router.push({ name: 'CategorySelection' }); 
     };
 
     const navigateToAdmin = () => {
@@ -70,7 +70,7 @@ export default defineComponent({
     return {
       hasScoresToClear,
       clearAllScores,
-      navigateToImagemOcultaGame,
+      navigateToCategorySelection, 
       navigateToAdmin,
     };
   },
@@ -79,6 +79,7 @@ export default defineComponent({
 
 <style scoped>
 /* Seu CSS existente do SplashScreen */
+/* ... (mantenha o CSS original) ... */
 .splash-screen-wrapper {
   display: flex;
   flex-direction: column;

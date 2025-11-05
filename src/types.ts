@@ -29,7 +29,7 @@ export interface Character {
 
 // NOVA INTERFACE: Para uma Categoria
 export interface Category {
-  id: number;
+  id: number; // ID é number
   name: string;
 }
 
@@ -58,7 +58,8 @@ export interface GameState {
   activeTeam: TeamColor | null;
   characters: Character[];
   isLoadingCharacters: boolean;
-  playedCharacterIds: string[]
+  playedCharacterIds: string[];
+  selectedCategoryIds: number[]; // ADICIONADO: Array de IDs de categorias selecionadas (number)
 }
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';

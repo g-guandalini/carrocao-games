@@ -15,10 +15,12 @@
     </div>
 
     <div class="menu-options">
-      <button class="menu-button primary" @click="navigateToCategorySelection"> <!-- ALTERADO AQUI -->
+      <!-- Botão para Imagem Oculta -->
+      <button class="menu-button primary" @click="navigateToCategorySelection('imagem-oculta')">
         Imagem Oculta
       </button>
-      <button class="menu-button" @click="$emit('select-connection')">
+      <!-- NOVO: Botão para Conexão -->
+      <button class="menu-button" @click="navigateToCategorySelection('conexao')">
         Conexão
       </button>
       <button class="menu-button" @click="$emit('select-bug')">
@@ -35,12 +37,13 @@
 <script lang="ts">
 import { defineComponent, computed } from 'vue';
 import { scoreStore, resetScores } from '../store/scoreStore';
-import { resetGameScores as resetImagemOcultaGameScores } from '../store/imagemOcultaStore';
+import { resetImagemOcultaGameScores } from '../store/imagemOcultaStore'; 
+import { resetConexaoGameScores } from '../store/conexaoStore'; // Importe a função de reset para Conexão
 import { useRouter } from 'vue-router'; 
 
 export default defineComponent({
   name: 'SplashScreen',
-  emits: ['select-connection', 'select-bug'],
+  emits: ['select-bug'],
   setup() {
     const router = useRouter();
 
@@ -57,10 +60,18 @@ export default defineComponent({
       }
     };
 
-    const navigateToCategorySelection = async () => {
-      console.log('[SplashScreen] Clicou em Imagem Oculta. Navegando para seleção de categorias.');
-      await resetImagemOcultaGameScores(); // Reseta o estado do jogo (incluindo playedCharacterIds) antes da seleção de categoria.
-      router.push({ name: 'CategorySelection' }); 
+    const navigateToCategorySelection = async (gameType: 'imagem-oculta' | 'conexao') => {
+      console.log(`[SplashScreen] Clicou em ${gameType === 'imagem-oculta' ? 'Imagem Oculta' : 'Conexão'}. Navegando para seleção de categorias.`);
+      
+      // Reseta o estado do jogo específico antes de navegar
+      if (gameType === 'imagem-oculta') {
+        await resetImagemOcultaGameScores(); 
+      } else if (gameType === 'conexao') {
+        await resetConexaoGameScores(); 
+      }
+
+      // Navega para a tela de seleção de categoria, passando o tipo de jogo como parâmetro de query
+      router.push({ name: 'CategorySelection', query: { game: gameType } }); 
     };
 
     const navigateToAdmin = () => {
@@ -124,14 +135,6 @@ export default defineComponent({
 .splash-header-content {
   text-align: center;
   margin-bottom: 0px;
-}
-
-.splash-main-title {
-  color: #2c3e50;
-  margin-bottom: 15px;
-  font-size: 3.5em;
-  font-weight: 700;
-  letter-spacing: 1px;
 }
 
 .splash-logo-area {

@@ -1,8 +1,8 @@
 // src/store/imagemOcultaStore.ts
 import { reactive, watch } from 'vue';
-import { GameState, TeamColor, Character, GameStatus, Category } from '../types'; 
+import { ImagemOcultaGameState, TeamColor, Character, GameStatus, Category } from '../types'; 
 import { addToast } from './toastStore';
-import { scoreStore, fetchScores, updateScore, resetScores } from './scoreStore';
+import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
 
 const API_BASE_URL = 'http://localhost:3001';
 const LOCAL_STORAGE_PLAYED_CHARS_KEY = 'imagemOcultaGamePlayedChars';
@@ -107,7 +107,7 @@ const initialRoundStateDefaults = () => ({
   activeTeam: null as TeamColor | null,
 });
 
-const initialState: GameState = {
+const initialState: ImagemOcultaGameState = { // Usa ImagemOcultaGameState
   ...initialRoundStateDefaults(),
   characters: [],
   isLoadingCharacters: false,
@@ -115,74 +115,64 @@ const initialState: GameState = {
   selectedCategoryIds: loadSelectedCategoryIds(), 
 };
 
-export const imagemOcultaStore = reactive<GameState>({ ...initialState });
+export const imagemOcultaStore = reactive<ImagemOcultaGameState>({ ...initialState });
 
 let revealInterval: number | null = null;
 const REVEAL_DURATION_MS = 30000;
 const REVEAL_STEP_MS = 100;
 
-let charactersFetchPromise: Promise<void> | null = null;
-
-// Interface para a resposta da API, AGORA ESPERA A ESTRUTURA COMPLETA DO BACKEND
-// Corresponde à ImagemOcultaItem[] que o backend retorna agora
+// Interface para a resposta da API de Imagem Oculta
 interface ApiImagemOcultaResponse { 
   id: number;
   hint: string;
-  answer: string; // O backend agora retorna 'answer' diretamente
+  answer: string; 
   imageUrl: string;
   order_idx: number | null;
-  categories: Category[]; // O backend agora retorna 'categories'
+  categories: Category[]; 
 }
 
-export async function fetchCharacters(categoryIds: number[] = imagemOcultaStore.selectedCategoryIds): Promise<void> { 
-  if (charactersFetchPromise) {
-    return charactersFetchPromise;
-  }
+export async function fetchImagemOcultaCharacters(categoryIds: number[] = imagemOcultaStore.selectedCategoryIds): Promise<void> { 
+  imagemOcultaStore.isLoadingCharacters = true;
+  try {
+    let url = `${API_BASE_URL}/api/imagem-oculta`; // Ajustado para rota de jogo
+    // Garante que categoryIds é um array e filtra valores nulos/undefined se houver
+    const actualCategoryIds = categoryIds?.filter(id => id != null) || []; 
 
-  charactersFetchPromise = (async () => {
-    imagemOcultaStore.isLoadingCharacters = true;
-    try {
-      let url = `${API_BASE_URL}/api/admin/imagem-oculta`; 
-      if (categoryIds && categoryIds.length > 0) {
-        url += `?categoryIds=${categoryIds.join(',')}`;
-      }
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-      const data: ApiImagemOcultaResponse[] = await response.json(); // Usa a interface completa
-      
-      // Mapeia da ApiImagemOcultaResponse para a interface Character do jogo
-      imagemOcultaStore.characters = data.map(item => ({
-        id: String(item.id), // ID do Character é string
-        name: item.answer,   // Mapeia 'answer' da API para 'name' no Character
-        imageUrl: item.imageUrl,
-        hint: item.hint,
-        order_idx: item.order_idx,
-      }));
-      
-    } catch (error) {
-      console.error('[FetchCharacters] Falha ao buscar personagens:', error);
-      addToast('Erro ao carregar personagens do servidor!', 'error');
-      imagemOcultaStore.characters = [];
-    } finally {
-      imagemOcultaStore.isLoadingCharacters = false;
-      charactersFetchPromise = null;
+    if (actualCategoryIds.length > 0) {
+      url += `?categoryIds=${actualCategoryIds.join(',')}`;
     }
-  })();
 
-  return charactersFetchPromise;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Erro HTTP: ${response.status}`);
+    }
+    const data: ApiImagemOcultaResponse[] = await response.json(); 
+    
+    imagemOcultaStore.characters = data.map(item => ({
+      id: String(item.id), 
+      name: item.answer,   
+      imageUrl: item.imageUrl,
+      hint: item.hint,
+      order_idx: item.order_idx,
+    }));
+    
+  } catch (error) {
+    console.error('[fetchImagemOcultaCharacters] Falha ao buscar personagens:', error);
+    addToast('Erro ao carregar personagens do servidor!', 'error');
+    imagemOcultaStore.characters = [];
+  } finally {
+    imagemOcultaStore.isLoadingCharacters = false;
+  }
 }
 
-export function setSelectedCategories(ids: number[]) { 
+export function setSelectedImagemOcultaCategories(ids: number[]) { 
     imagemOcultaStore.selectedCategoryIds = ids;
     saveSelectedCategoryIds(ids);
     imagemOcultaStore.playedCharacterIds = [];
     savePlayedCharacterIds([]);
 }
 
-function pickNextCharacterId(): string | null {
+function pickNextImagemOcultaCharacterId(): string | null {
   let availableCharacters = imagemOcultaStore.characters.filter(
     (char) => !imagemOcultaStore.playedCharacterIds.includes(char.id)
   );
@@ -214,12 +204,12 @@ function pickNextCharacterId(): string | null {
   return null;
 }
 
-async function startNewCleanRound() {
-  stopReveal();
+async function startNewCleanImagemOcultaRound() {
+  stopImagemOcultaReveal(); 
   Object.assign(imagemOcultaStore, initialRoundStateDefaults());
   clearCurrentRoundStateFromLocalStorage();
 
-  await fetchCharacters(); 
+  await fetchImagemOcultaCharacters(); 
 
   if (imagemOcultaStore.characters.length === 0) {
     addToast('Não foi possível iniciar a rodada: nenhum personagem carregado com as categorias selecionadas. Verifique as categorias ou o servidor!', 'error');
@@ -227,7 +217,7 @@ async function startNewCleanRound() {
     return;
   }
 
-  const nextCharacterId = pickNextCharacterId();
+  const nextCharacterId = pickNextImagemOcultaCharacterId();
   if (nextCharacterId) {
     const nextCharacter = imagemOcultaStore.characters.find(char => char.id === nextCharacterId);
     if (nextCharacter) {
@@ -246,8 +236,8 @@ async function startNewCleanRound() {
   }
 }
 
-export async function initializeGame() {
-  await fetchCharacters();
+export async function initializeImagemOcultaGame() { 
+  await fetchImagemOcultaCharacters();
 
   if (!scoreStore.isLoadingScores) {
     await fetchScores(); 
@@ -271,27 +261,27 @@ export async function initializeGame() {
       imagemOcultaStore.activeTeam = savedRoundState.activeTeam;
 
       if (imagemOcultaStore.gameStatus === 'revealing') {
-        proceedToReveal();
+        proceedToRevealImagemOculta(); 
       }
     } else {
       clearCurrentRoundStateFromLocalStorage(); 
-      await startNewCleanRound();
+      await startNewCleanImagemOcultaRound();
     }
   } else {
-    await startNewCleanRound(); 
+    await startNewCleanImagemOcultaRound(); 
   }
 }
 
-export async function startNextGameRound() {
-  await startNewCleanRound();
+export async function startNextImagemOcultaGameRound() { 
+  await startNewCleanImagemOcultaRound();
 }
 
-export function proceedToReveal() {
+export function proceedToRevealImagemOculta() { 
   if (!imagemOcultaStore.currentRoundCharacter) {
     addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error');
     return;
   }
-  stopReveal(); 
+  stopImagemOcultaReveal(); 
 
   imagemOcultaStore.gameStatus = 'revealing';
   const startTime = Date.now() - (imagemOcultaStore.revealProgress * REVEAL_DURATION_MS); 
@@ -303,7 +293,7 @@ export function proceedToReveal() {
 
     if (imagemOcultaStore.revealProgress >= 1) {
       imagemOcultaStore.revealProgress = 1;
-      stopReveal(); 
+      stopImagemOcultaReveal(); 
       imagemOcultaStore.gameStatus = 'finished'; 
       if (imagemOcultaStore.currentRoundCharacter) {
         imagemOcultaStore.playedCharacterIds.push(imagemOcultaStore.currentRoundCharacter.id);
@@ -315,26 +305,26 @@ export function proceedToReveal() {
   }, REVEAL_STEP_MS) as unknown as number;
 }
 
-export function stopReveal() {
+export function stopImagemOcultaReveal() { 
   if (revealInterval) {
     clearInterval(revealInterval);
     revealInterval = null;
   }
 }
 
-export function selectTeam(team: TeamColor) {
+export function selectImagemOcultaTeam(team: TeamColor) { 
   if (imagemOcultaStore.gameStatus === 'revealing') {
-    stopReveal(); 
+    stopImagemOcultaReveal(); 
     imagemOcultaStore.activeTeam = team;
     imagemOcultaStore.gameStatus = 'guessing';
     saveCurrentRoundStateToLocalStorage(); 
     addToast(`Equipe <strong>${team}</strong> irá palpitar!`, 'info');
   } else {
-    console.warn('--- [SelectTeam] Tentativa de selecionar equipe em gameStatus inválido:', imagemOcultaStore.gameStatus);
+    console.warn('--- [selectImagemOcultaTeam] Tentativa de selecionar equipe em gameStatus inválido:', imagemOcultaStore.gameStatus);
   }
 }
 
-export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: number) {
+export async function handleOperatorImagemOcultaFeedback(isCorrect: boolean, scoreAwarded: number) { 
   if (!imagemOcultaStore.activeTeam || !imagemOcultaStore.currentRoundCharacter) {
     console.warn("Feedback do operador recebido em um estado inválido ou sem time ativo.");
     return;
@@ -358,13 +348,13 @@ export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: n
   clearCurrentRoundStateFromLocalStorage(); 
 }
 
-export function viewScoreboard() {
+export function viewImagemOcultaScoreboard() { 
   imagemOcultaStore.gameStatus = 'scoreboard';
 }
 
-export async function resetGameScores() {
-    stopReveal();
-    await resetScores();
+export async function resetImagemOcultaGameScores() { 
+    stopImagemOcultaReveal();
+    // NÃO CHAME resetScores() AQUI. Ele deve ser chamado globalmente pelo SplashScreen se necessário.
     Object.assign(imagemOcultaStore, initialRoundStateDefaults());
     imagemOcultaStore.playedCharacterIds = [];
     savePlayedCharacterIds([]);

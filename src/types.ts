@@ -39,19 +39,49 @@ export interface ImagemOcultaItem {
   hint: string;
   answer: string;
   imageUrl: string;
+  order_idx?: number | null; // Adicionado aqui para o admin
   categories: Category[]; // Array de categorias associadas
 }
+
+// =========================================================
+//                  NOVAS INTERFACES PARA CONEXÃO (AJUSTADO)
+// =========================================================
+// Interface para um item de Conexão (para o JOGO)
+export interface Conexao {
+  id: string; // O ID virá do banco de dados (number, mas trataremos como string no frontend por conveniência)
+  palavra: string; // A palavra a ser adivinhada
+  imageUrl: string;
+  order_idx?: number | null; // Novo campo para ordem
+  // Novo campo para rastrear letras reveladas (para a lógica do jogo)
+  revealedLetters?: Set<number>; // Conjunto de índices das letras reveladas
+}
+
+// Interface para um item de Conexão (para ADMIN, com categorias)
+export interface ConexaoAdminItem { // Corresponde à estrutura do backend para /api/admin/conexao
+  id: number;
+  palavra: string;
+  imageUrl: string;
+  order_idx?: number | null; // Novo campo para ordem
+  categories: Category[]; // Array de categorias associadas
+}
+// =========================================================
+//            FIM DAS NOVAS INTERFACES PARA CONEXÃO
+// =========================================================
 
 // NOVA INTERFACE: Para a store de administração
 export interface AdminState {
   categories: Category[];
   imagemOcultaItems: ImagemOcultaItem[];
+  conexaoItems: ConexaoAdminItem[]; // NOVO: para gerenciamento de conexões no admin
   isLoadingCategories: boolean;
   isLoadingImagemOculta: boolean;
-  selectedImagemOcultaItem: ImagemOcultaItem | null; // Para edição
+  isLoadingConexao: boolean; // NOVO: para conexões
+  selectedImagemOcultaItem: ImagemOcultaItem | null; 
+  selectedConexaoItem: ConexaoAdminItem | null; // NOVO: para edição de conexão
 }
 
-export interface GameState {
+// Estado do jogo para Imagem Oculta
+export interface ImagemOcultaGameState {
   currentRoundCharacter: Character | null;
   revealProgress: number;
   gameStatus: GameStatus;
@@ -59,8 +89,26 @@ export interface GameState {
   characters: Character[];
   isLoadingCharacters: boolean;
   playedCharacterIds: string[];
-  selectedCategoryIds: number[]; // ADICIONADO: Array de IDs de categorias selecionadas (number)
+  selectedCategoryIds: number[]; 
 }
+
+// =========================================================
+//            NOVA INTERFACE: ConexaoGameState
+// =========================================================
+// Estado do jogo para Conexão
+export interface ConexaoGameState { 
+  currentRoundConexao: Conexao | null; // Item da rodada atual
+  revealedLettersCount: number; // Quantas letras foram reveladas
+  gameStatus: GameStatus;
+  activeTeam: TeamColor | null;
+  conexoes: Conexao[]; // Lista de itens de conexão disponíveis
+  isLoadingConexoes: boolean; // Estado de carregamento
+  playedConexaoIds: string[]; // IDs das conexões já jogadas
+  selectedCategoryIds: number[]; // IDs das categorias selecionadas
+}
+// =========================================================
+//            FIM DA NOVA INTERFACE: ConexaoGameState
+// =========================================================
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 

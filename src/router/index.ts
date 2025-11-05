@@ -2,11 +2,12 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import SplashScreen from '../components/SplashScreen.vue';
 import ImagemOcultaView from '../views/ImagemOcultaView.vue';
+import ConexaoView from '../views/ConexaoView.vue'; // Importa a view do jogo Conexão
 import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import CategoryManagement from '../views/admin/CategoryManagement.vue';
 import ImagemOcultaManagement from '../views/admin/ImagemOcultaManagement.vue';
-import CategorySelectionScreen from '../components/CategorySelectionScreen.vue'; 
 import ConexaoManagement from '../views/admin/ConexaoManagement.vue'; 
+import CategorySelectionScreen from '../components/CategorySelectionScreen.vue'; 
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -23,6 +24,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/imagem-oculta',
     name: 'ImagemOcultaGame',
     component: ImagemOcultaView,
+  },
+  // Rota para o jogo Conexão
+  {
+    path: '/conexao',
+    name: 'ConexaoGame',
+    component: ConexaoView,
   },
   {
     path: '/admin',
@@ -50,11 +57,11 @@ const routes: Array<RouteRecordRaw> = [
         }
       },
       {
-        path: 'conexao', // O caminho da URL para este gerenciamento
-        name: 'AdminConexao', // O nome da rota
-        component: ConexaoManagement, // O componente Vue que acabamos de criar
+        path: 'conexao', 
+        name: 'AdminConexao', 
+        component: ConexaoManagement,
         meta: {
-            title: 'Gerenciar Conexões' // Título para fins de navegação ou exibição
+            title: 'Gerenciar Conexões' 
         }
       },
     ],

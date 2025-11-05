@@ -8,7 +8,6 @@
       :reveal-progress="imagemOcultaStore.revealProgress"
       :game-status="imagemOcultaStore.gameStatus"
       :active-team="imagemOcultaStore.activeTeam"
-      :score="imagemOcultaStore.scores"
       @evaluate-guess="handleOperatorFeedback"
       @view-scoreboard="viewScoreboardFromGame"
     />
@@ -31,17 +30,16 @@
 
 <script lang="ts">
 import { defineComponent, onMounted, onUnmounted } from 'vue';
-// IMPORT ATUALIZADO: Importe initializeGame e startNextGameRound (os novos nomes)
 import { 
   imagemOcultaStore, 
-  initializeGame, // Chamada para montagem inicial
-  startNextGameRound, // Chamada para o botão "Próxima Rodada"
-  selectTeam, 
-  handleOperatorFeedback as handleOperatorFeedbackInStore, 
-  resetGameScores, 
-  viewScoreboard 
+  initializeImagemOcultaGame, // ATUALIZADO: Nome da função de inicialização
+  startNextImagemOcultaGameRound, // ATUALIZADO: Nome da função para próxima rodada
+  selectImagemOcultaTeam, // ATUALIZADO: Nome da função para seleção de time
+  handleOperatorImagemOcultaFeedback, // ATUALIZADO: Nome da função de feedback do operador
+  resetImagemOcultaGameScores, // ATUALIZADO: Nome da função de reset de scores
+  viewImagemOcultaScoreboard // ATUALIZADO: Nome da função para ver placar
 } from '../store/imagemOcultaStore';
-import { TeamColor } from '../types'; // Certifique-se que TeamColor está definido e importado corretamente
+import { TeamColor } from '../types'; 
 import { useRouter } from 'vue-router'; 
 
 import GameHeader from '../components/GameHeader.vue';
@@ -61,55 +59,55 @@ export default defineComponent({
     // Mapeia o feedback do operador para a função do store
     const handleOperatorFeedback = (isCorrect: boolean, scoreAwarded: number) => {
       console.log(`[ImagemOcultaView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
-      handleOperatorFeedbackInStore(isCorrect, scoreAwarded);
+      // ATUALIZADO: Chama a função com o novo nome
+      handleOperatorImagemOcultaFeedback(isCorrect, scoreAwarded);
     };
 
     // Lógica para seleção de time via teclado
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (imagemOcultaStore.gameStatus === 'revealing') {
         let selectedTeam: TeamColor | null = null;
-        // Ajuste TeamColor para o tipo correto se necessário, ex: TeamColor.Azul
-        // Exemplo: if (event.key === '1') selectedTeam = 'Azul';
-        // É importante que 'TeamColor' seja um enum ou tipo literal que corresponda aos valores
-        // Como você tem `TeamColor.BLUE`, etc, estou supondo que TeamColor é um enum.
-        // Se for um tipo literal, você precisará ajustar o switch case para strings literais ('Azul', 'Vermelho', etc.)
         switch (event.key) {
-          case '1': selectedTeam = 'Azul'; break;
-          case '2': selectedTeam = 'Vermelho'; break;
-          case '3': selectedTeam = 'Verde'; break;
-          case '4': selectedTeam = 'Amarelo'; break;
+          case '1': selectedTeam = TeamColor.BLUE; break; // Use TeamColor enum values
+          case '2': selectedTeam = TeamColor.RED; break;
+          case '3': selectedTeam = TeamColor.GREEN; break;
+          case '4': selectedTeam = TeamColor.YELLOW; break;
         }
 
         if (selectedTeam) {
           event.preventDefault(); 
-          selectTeam(selectedTeam);
+          // ATUALIZADO: Chama a função com o novo nome
+          selectImagemOcultaTeam(selectedTeam);
         }
       }
     };
 
     // Mapeia a ação de ver placar para a função do store
     const viewScoreboardFromGame = () => {
-      viewScoreboard();
+      // ATUALIZADO: Chama a função com o novo nome
+      viewImagemOcultaScoreboard();
     };
     
     // NOVO: Função para o botão "Próxima Rodada" do ScoreboardScreen
     const handleNextRoundFromScoreboard = () => {
-      console.log('[ImagemOcultaView] handleNextRoundFromScoreboard: Chamando startNextGameRound()...');
-      startNextGameRound(); // Esta função sempre inicia uma rodada limpa
+      console.log('[ImagemOcultaView] handleNextRoundFromScoreboard: Chamando startNextImagemOcultaGameRound()...');
+      // ATUALIZADO: Chama a função com o novo nome
+      startNextImagemOcultaGameRound(); 
     };
 
     // Mapeia a ação de resetar jogo para a função do store
     const handleResetGame = () => {
-      console.log('[ImagemOcultaView] handleResetGame: Chamando resetGameScores()...');
-      resetGameScores(); 
+      console.log('[ImagemOcultaView] handleResetGame: Chamando resetImagemOcultaGameScores()...');
+      // ATUALIZADO: Chama a função com o novo nome
+      resetImagemOcultaGameScores(); 
       router.push({ name: 'Home' }); // Volta para a tela inicial
     };
 
     onMounted(() => {
       document.addEventListener('keydown', handleGlobalKeyDown);
-      console.log('[ImagemOcultaView] onMounted: Chamando initializeGame()...');
-      // A função initializeGame() do store é responsável por restaurar uma rodada ou iniciar uma nova.
-      initializeGame(); 
+      console.log('[ImagemOcultaView] onMounted: Chamando initializeImagemOcultaGame()...');
+      // ATUALIZADO: Chama a função com o novo nome
+      initializeImagemOcultaGame(); 
     });
 
     onUnmounted(() => {
@@ -118,7 +116,7 @@ export default defineComponent({
 
     return {
       imagemOcultaStore,
-      handleNextRoundFromScoreboard, // Exponha a nova função para o template
+      handleNextRoundFromScoreboard, 
       handleOperatorFeedback,
       viewScoreboardFromGame,
       handleResetGame,

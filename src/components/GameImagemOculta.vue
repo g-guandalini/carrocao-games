@@ -12,7 +12,7 @@
     </div>
 
     <!-- Exibição da Imagem (visível em todas as fases, exceto 'hint' e 'scoreboard') -->
-    <div v-show="gameStatus !== 'hint'" class="image-display" ref="imageDisplayRef">
+    <div v-show="gameStatus !== 'hint' && gameStatus !== 'scoreboard'" class="image-display" ref="imageDisplayRef">
       <ImageTiler
         :key="currentRoundCharacter?.id"
         :image-url="currentRoundCharacter?.imageUrl || ''"
@@ -36,9 +36,9 @@
     <!-- Container para a mensagem finalizada e o botão "Ver Placar" -->
     <div v-if="gameStatus === 'finished'" class="finished-status-container">
       <p class="timer-info no-margin-bottom">
-        Rodada finalizada! Respota Correta: <strong>{{ currentRoundCharacter?.name }}</strong>
+        Rodada finalizada! Resposta Correta: <strong>{{ currentRoundCharacter?.name }}</strong>
       </p>
-      <button @click="$emit('view-scoreboard')" class="view-scoreboard-button">
+      <button @click="viewImagemOcultaScoreboard" class="view-scoreboard-button"> <!-- ATUALIZADO AQUI -->
         Ver Placar
       </button>
     </div>
@@ -61,12 +61,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted, watch, nextTick, computed, PropType } from 'vue'; // Importar 'computed'
+import { defineComponent, ref, onMounted, onUnmounted, watch, nextTick, computed, PropType } from 'vue';
 import ImageTiler from './ImageTiler.vue';
 import ToastNotification from './ToastNotification.vue';
 import AnswerFeedback from './AnswerFeedback.vue';
 import { Character, GameStatus, TeamColor } from '../types';
-import { proceedToReveal } from '../store/imagemOcultaStore';
+import { 
+  proceedToRevealImagemOculta, // ATUALIZADO: Usando o nome correto
+  viewImagemOcultaScoreboard // ATUALIZADO: Usando o nome correto
+} from '../store/imagemOcultaStore'; // Importando do store
+import { scoreStore } from '../store/scoreStore'; // Importar scoreStore para acessar o score atual
 
 export default defineComponent({
   name: 'GameImagemOculta',
@@ -92,12 +96,12 @@ export default defineComponent({
       type: String as PropType<TeamColor | null>,
       default: null,
     },
-    score: {
-      type: Object as PropType<Record<TeamColor, number>>,
-      required: true,
-    },
+    // REMOVIDO: A prop 'score' não é mais necessária aqui, pois será acessada via scoreStore.
+    // score: {
+    //   type: Object as PropType<Record<TeamColor, number>>,
+    //   required: true,
+    // },
   },
-  // O evento 'evaluate-guess' agora espera dois argumentos: isCorrect (boolean) e scoreAwarded (number)
   emits: ['evaluate-guess', 'view-scoreboard'], 
   setup(_props, { emit }) {
     const imageDisplayRef = ref<HTMLElement | null>(null);
@@ -116,14 +120,9 @@ export default defineComponent({
 
     // ----- NOVA PROPRIEDADE COMPUTADA PARA A PONTUAÇÃO DA RODADA -----
     const currentPotentialRoundScore = computed(() => {
-      // 100 pontos iniciais por rodada
       const initialScore = 100;
-      // Quantidade de tiles revelados (revealProgress vai de 0 a 1)
-      // Multiplicamos por 100 para ter a contagem de tiles (já que são 100 tiles no total)
       const tilesRevealed = Math.floor(_props.revealProgress * 100);
-      // Deduz 1 ponto por tile revelado
       const deductedPoints = tilesRevealed;
-      // Garante que a pontuação não seja menor que 0
       return Math.max(0, initialScore - deductedPoints);
     });
     // ------------------------------------------------------------------
@@ -170,7 +169,7 @@ export default defineComponent({
 
     const stopTypingAndProceed = () => {
       stopTypingAndAudio();
-      proceedToReveal();
+      proceedToRevealImagemOculta(); // ATUALIZADO: Usando o nome correto
     };
 
     const updateImageDimensions = () => {
@@ -197,7 +196,8 @@ export default defineComponent({
         stopTypingAndAudio();
       }
 
-      if (newGameStatus !== 'hint' && newImageDisplayRef) {
+      // Garante que o redimensionamento ocorra se a imagem for visível
+      if (newGameStatus !== 'hint' && newGameStatus !== 'scoreboard' && newImageDisplayRef) {
         nextTick(() => {
           updateImageDimensions();
         });
@@ -251,12 +251,13 @@ export default defineComponent({
       failAnswerAudio,
       displayedHint,
       isTyping,
-      currentPotentialRoundScore, // Retornar para o template
+      currentPotentialRoundScore, 
       calculatedImageWidth,
       calculatedImageHeight,
       handleCorrectAnswer,
       handleWrongAnswer,
       teamColorToHex,
+      viewImagemOcultaScoreboard, // ATUALIZADO: Retornar para o template
     };
   },
 });

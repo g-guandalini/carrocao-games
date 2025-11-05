@@ -21,6 +21,11 @@
               <i class="fas fa-image"></i> Imagem Oculta
             </router-link>
           </li>
+          <li>
+            <router-link :to="{ name: 'AdminConexao' }" class="nav-link">
+              <i class="fas fa-plug"></i> Conexão
+            </router-link>
+          </li>
         </ul>
       </nav>
       <!-- NOVO: Footer do Sidebar -->

@@ -5,7 +5,8 @@ import ImagemOcultaView from '../views/ImagemOcultaView.vue';
 import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import CategoryManagement from '../views/admin/CategoryManagement.vue';
 import ImagemOcultaManagement from '../views/admin/ImagemOcultaManagement.vue';
-import CategorySelectionScreen from '../components/CategorySelectionScreen.vue'; // IMPORTE AQUI
+import CategorySelectionScreen from '../components/CategorySelectionScreen.vue'; 
+import ConexaoManagement from '../views/admin/ConexaoManagement.vue'; 
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -14,7 +15,7 @@ const routes: Array<RouteRecordRaw> = [
     component: SplashScreen,
   },
   {
-    path: '/category-selection', // NOVA ROTA
+    path: '/category-selection', 
     name: 'CategorySelection',
     component: CategorySelectionScreen,
   },
@@ -46,6 +47,14 @@ const routes: Array<RouteRecordRaw> = [
         component: ImagemOcultaManagement,
         meta: {
             title: 'Gerenciar Imagem Oculta' 
+        }
+      },
+      {
+        path: 'conexao', // O caminho da URL para este gerenciamento
+        name: 'AdminConexao', // O nome da rota
+        component: ConexaoManagement, // O componente Vue que acabamos de criar
+        meta: {
+            title: 'Gerenciar Conexões' // Título para fins de navegação ou exibição
         }
       },
     ],

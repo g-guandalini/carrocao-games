@@ -7,6 +7,13 @@ const { initializeDatabase, getDb, runAsync, allAsync, getAsync } = require('./d
 
 const categoryRoutes = require('./routes/categoryRoutes');
 const imagemOcultaRoutes = require('./routes/imagemOcultaRoutes');
+// =========================================================
+//                  NOVA ROTA PARA CONEXÃO
+// =========================================================
+const conexaoRoutes = require('./routes/conexaoRoutes');
+// =========================================================
+//               FIM DA NOVA ROTA PARA CONEXÃO
+// =========================================================
 
 const app = express();
 const PORT = 3001;
@@ -15,15 +22,27 @@ app.use(cors());
 app.use(express.json());
 
 // --- Configuração para servir arquivos estáticos ---
-// CORREÇÃO AQUI: A pasta 'public' agora é um subdiretório da pasta 'server'.
-// `__dirname` em `server/index.ts` é o diretório `server`.
 const publicPath = path.join(__dirname, '..', 'public'); 
+
 // Garante que a pasta public/characters exista dentro de server/public
 const charactersUploadPath = path.join(publicPath, 'characters');
 if (!fs.existsSync(charactersUploadPath)) {
     fs.mkdirSync(charactersUploadPath, { recursive: true });
     console.log(`Pasta de upload de imagens criada em: ${charactersUploadPath}`);
 }
+
+// =========================================================
+//        NOVA PASTA DE UPLOAD PARA IMAGENS DE CONEXÃO
+// =========================================================
+const conexaoImagesUploadPath = path.join(publicPath, 'conexao_images');
+if (!fs.existsSync(conexaoImagesUploadPath)) {
+    fs.mkdirSync(conexaoImagesUploadPath, { recursive: true });
+    console.log(`Pasta de upload de imagens de conexão criada em: ${conexaoImagesUploadPath}`);
+}
+// =========================================================
+//     FIM DA NOVA PASTA DE UPLOAD PARA IMAGENS DE CONEXÃO
+// =========================================================
+
 app.use(express.static(publicPath));
 console.log(`Servindo arquivos estáticos de: ${publicPath} na raiz URL '/' do servidor Express.`);
 // --- Fim da configuração de arquivos estáticos ---
@@ -33,7 +52,7 @@ app.get('/', (req, res) => {
     res.send('Servidor Imagem Oculta API está online!');
 });
 
-// Rota para obter todos os itens de imagem oculta (para o jogo)
+// Rota para obter todos os itens de imagem oculta (para o jogo) - AINDA NÃO MUDEI
 app.get('/api/imagem-oculta/characters', async (req, res) => {
     const db = getDb();
     if (!db) {
@@ -108,6 +127,13 @@ app.post('/api/scores/reset', async (req, res) => {
 // Monta os roteadores de CRUD sob o prefixo /api/admin
 app.use('/api/admin/categories', categoryRoutes);
 app.use('/api/admin/imagem-oculta', imagemOcultaRoutes);
+// =========================================================
+//                   INTEGRAÇÃO DAS ROTAS DE CONEXÃO
+// =========================================================
+app.use('/api/admin/conexao', conexaoRoutes);
+// =========================================================
+//              FIM DA INTEGRAÇÃO DAS ROTAS DE CONEXÃO
+// =========================================================
 
 // Inicializa o banco de dados e depois inicia o servidor
 initializeDatabase()

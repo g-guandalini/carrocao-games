@@ -4,7 +4,8 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { runAsync, getAsync, allAsync } = require('../database');
-const upload = require('../utils/upload');
+const createUploader = require('../utils/upload'); // AGORA: Importa a função fábrica
+const upload = createUploader('characters'); // AGORA: Cria um uploader para a pasta 'characters'
 const multer = require('multer'); // Importar multer para MulterError
 
 // Função auxiliar para obter o caminho completo do arquivo de imagem

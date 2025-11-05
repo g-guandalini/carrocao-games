@@ -1,11 +1,106 @@
 // src/store/imagemOcultaStore.ts
-import { reactive } from 'vue';
-import { GameState, TeamColor, Character, GameStatus } from '../types';
+import { reactive, watch } from 'vue';
+import { GameState, TeamColor, Character, GameStatus, Category } from '../types'; 
 import { addToast } from './toastStore';
+import { scoreStore, fetchScores, updateScore, resetScores } from './scoreStore';
 
-const API_BASE_URL = 'http://localhost:3001'; // Ajuste se seu backend rodar em outra porta ou domínio
+const API_BASE_URL = 'http://localhost:3001';
+const LOCAL_STORAGE_PLAYED_CHARS_KEY = 'imagemOcultaGamePlayedChars';
+const LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY = 'imagemOcultaCurrentRoundState';
+const LOCAL_STORAGE_SELECTED_CATEGORIES_KEY = 'imagemOcultaSelectedCategories';
 
-const initialRoundState = () => ({
+interface SavedRoundState {
+  currentRoundCharacterId: string | null;
+  revealProgress: number;
+  gameStatus: GameStatus;
+  activeTeam: TeamColor | null;
+  selectedCategoryIds: number[]; 
+}
+
+// --- Funções auxiliares para localStorage ---
+function savePlayedCharacterIds(ids: string[]) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_PLAYED_CHARS_KEY, JSON.stringify(ids));
+  } catch (e) {
+    console.error('Erro ao salvar IDs de personagens jogados no localStorage:', e);
+  }
+}
+
+function loadPlayedCharacterIds(): string[] {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_PLAYED_CHARS_KEY);
+    const ids = stored ? JSON.parse(stored) : [];
+    return ids;
+  } catch (e) {
+    console.error('Erro ao carregar IDs de personagens jogados do localStorage:', e);
+    return [];
+  }
+}
+
+function saveSelectedCategoryIds(ids: number[]) { 
+    try {
+        localStorage.setItem(LOCAL_STORAGE_SELECTED_CATEGORIES_KEY, JSON.stringify(ids));
+    } catch (e) {
+        console.error('Erro ao salvar IDs de categorias selecionadas no localStorage:', e);
+    }
+}
+
+function loadSelectedCategoryIds(): number[] { 
+    try {
+        const stored = localStorage.getItem(LOCAL_STORAGE_SELECTED_CATEGORIES_KEY);
+        const ids = stored ? JSON.parse(stored) : [];
+        return ids.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    } catch (e) {
+        console.error('Erro ao carregar IDs de categorias selecionadas do localStorage:', e);
+        return [];
+    }
+}
+
+function saveCurrentRoundStateToLocalStorage() {
+  if (imagemOcultaStore.currentRoundCharacter && 
+      imagemOcultaStore.gameStatus !== 'finished' && 
+      imagemOcultaStore.gameStatus !== 'idle') { 
+    const stateToSave: SavedRoundState = {
+      currentRoundCharacterId: imagemOcultaStore.currentRoundCharacter.id,
+      revealProgress: imagemOcultaStore.revealProgress,
+      gameStatus: imagemOcultaStore.gameStatus,
+      activeTeam: imagemOcultaStore.activeTeam,
+      selectedCategoryIds: imagemOcultaStore.selectedCategoryIds,
+    };
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY, JSON.stringify(stateToSave));
+    } catch (e) {
+      console.error('Erro ao salvar estado da rodada atual no localStorage:', e);
+    }
+  } else {
+    clearCurrentRoundStateFromLocalStorage();
+  }
+}
+
+function loadCurrentRoundStateFromLocalStorage(): SavedRoundState | null {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY);
+    const state = stored ? JSON.parse(stored) : null;
+    if (state && state.selectedCategoryIds) {
+        state.selectedCategoryIds = state.selectedCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    }
+    return state;
+  } catch (e) {
+    console.error('Erro ao carregar estado da rodada atual do localStorage:', e);
+    return null;
+  }
+}
+
+function clearCurrentRoundStateFromLocalStorage() {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY);
+  } catch (e) {
+    console.error('Erro ao limpar estado da rodada atual do localStorage:', e);
+  }
+}
+// --- Fim das funções auxiliares ---
+
+const initialRoundStateDefaults = () => ({
   currentRoundCharacter: null as Character | null,
   revealProgress: 0,
   gameStatus: 'idle' as GameStatus,
@@ -13,16 +108,11 @@ const initialRoundState = () => ({
 });
 
 const initialState: GameState = {
-  ...initialRoundState(),
-  score: { // Será preenchido pela API
-    [TeamColor.BLUE]: 0,
-    [TeamColor.RED]: 0,
-    [TeamColor.GREEN]: 0,
-    [TeamColor.YELLOW]: 0,
-  },
+  ...initialRoundStateDefaults(),
   characters: [],
   isLoadingCharacters: false,
-  isLoadingScores: false, // NOVO: Estado de carregamento para as pontuações
+  playedCharacterIds: loadPlayedCharacterIds(),
+  selectedCategoryIds: loadSelectedCategoryIds(), 
 };
 
 export const imagemOcultaStore = reactive<GameState>({ ...initialState });
@@ -31,87 +121,169 @@ let revealInterval: number | null = null;
 const REVEAL_DURATION_MS = 30000;
 const REVEAL_STEP_MS = 100;
 
-export async function fetchCharacters() {
-  imagemOcultaStore.isLoadingCharacters = true;
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/imagem-oculta/characters`);
-    if (!response.ok) {
-      throw new Error(`Erro HTTP: ${response.status}`);
-    }
-    const data = await response.json();
-    imagemOcultaStore.characters = data.characters.map((char: any) => ({
-      id: String(char.id),
-      name: char.answer,
-      imageUrl: char.imageUrl,
-      hint: char.hint,
-    }));
-    // addToast('Personagens carregados do banco de dados!', 'success'); // Comentado para evitar toast excessivo
-  } catch (error) {
-    console.error('Falha ao buscar personagens:', error);
-    addToast('Erro ao carregar personagens do servidor!', 'error');
-  } finally {
-    imagemOcultaStore.isLoadingCharacters = false;
-  }
+let charactersFetchPromise: Promise<void> | null = null;
+
+// Interface para a resposta da API, AGORA ESPERA A ESTRUTURA COMPLETA DO BACKEND
+// Corresponde à ImagemOcultaItem[] que o backend retorna agora
+interface ApiImagemOcultaResponse { 
+  id: number;
+  hint: string;
+  answer: string; // O backend agora retorna 'answer' diretamente
+  imageUrl: string;
+  order_idx: number | null;
+  categories: Category[]; // O backend agora retorna 'categories'
 }
 
-// NOVO: Função para buscar as pontuações da API
-export async function fetchScores() {
-  imagemOcultaStore.isLoadingScores = true;
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/scores`);
-    if (!response.ok) {
-      throw new Error(`Erro HTTP: ${response.status}`);
-    }
-    const scores = await response.json();
-    // Atualiza o objeto score na store com os dados do backend
-    imagemOcultaStore.score = scores;
-    console.log('Scores carregados do banco de dados:', scores);
-  } catch (error) {
-    console.error('Falha ao buscar scores:', error);
-    addToast('Erro ao carregar pontuações do servidor!', 'error');
-  } finally {
-    imagemOcultaStore.isLoadingScores = false;
+export async function fetchCharacters(categoryIds: number[] = imagemOcultaStore.selectedCategoryIds): Promise<void> { 
+  if (charactersFetchPromise) {
+    return charactersFetchPromise;
   }
+
+  charactersFetchPromise = (async () => {
+    imagemOcultaStore.isLoadingCharacters = true;
+    try {
+      let url = `${API_BASE_URL}/api/admin/imagem-oculta`; 
+      if (categoryIds && categoryIds.length > 0) {
+        url += `?categoryIds=${categoryIds.join(',')}`;
+      }
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+      const data: ApiImagemOcultaResponse[] = await response.json(); // Usa a interface completa
+      
+      // Mapeia da ApiImagemOcultaResponse para a interface Character do jogo
+      imagemOcultaStore.characters = data.map(item => ({
+        id: String(item.id), // ID do Character é string
+        name: item.answer,   // Mapeia 'answer' da API para 'name' no Character
+        imageUrl: item.imageUrl,
+        hint: item.hint,
+        order_idx: item.order_idx,
+      }));
+      
+    } catch (error) {
+      console.error('[FetchCharacters] Falha ao buscar personagens:', error);
+      addToast('Erro ao carregar personagens do servidor!', 'error');
+      imagemOcultaStore.characters = [];
+    } finally {
+      imagemOcultaStore.isLoadingCharacters = false;
+      charactersFetchPromise = null;
+    }
+  })();
+
+  return charactersFetchPromise;
 }
 
+export function setSelectedCategories(ids: number[]) { 
+    imagemOcultaStore.selectedCategoryIds = ids;
+    saveSelectedCategoryIds(ids);
+    imagemOcultaStore.playedCharacterIds = [];
+    savePlayedCharacterIds([]);
+}
 
-function pickRandomCharacter(): Character {
-  if (imagemOcultaStore.characters.length === 0) {
-    addToast('Nenhum personagem disponível para o jogo.', 'error');
-    return { id: 'error', name: 'Erro de Carregamento', imageUrl: '', hint: 'Tente recarregar a página.' };
-  }
-
-  const availableCharacters = imagemOcultaStore.characters.filter(
-    (char) => char.id !== imagemOcultaStore.currentRoundCharacter?.id
+function pickNextCharacterId(): string | null {
+  let availableCharacters = imagemOcultaStore.characters.filter(
+    (char) => !imagemOcultaStore.playedCharacterIds.includes(char.id)
   );
-
+  
   if (availableCharacters.length === 0) {
-    addToast('Todos os personagens foram jogados! Reiniciando a lista de seleção.', 'info');
-    // Para um jogo real, você pode recarregar de forma mais inteligente ou ter um pool maior.
-    return imagemOcultaStore.characters[Math.floor(Math.random() * imagemOcultaStore.characters.length)];
+    imagemOcultaStore.playedCharacterIds = [];
+    savePlayedCharacterIds([]);
+    availableCharacters = imagemOcultaStore.characters; 
+    addToast('Todas as imagens das categorias selecionadas foram jogadas. Reiniciando a lista para novas rodadas.', 'info');
   }
-  return availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
+
+  const orderedAvailable = availableCharacters
+    .filter(char => char.order_idx !== null && char.order_idx !== undefined)
+    .sort((a, b) => (a.order_idx || Infinity) - (b.order_idx || Infinity)); 
+  
+  if (orderedAvailable.length > 0) {
+    return orderedAvailable[0].id;
+  }
+
+  const unorderedAvailable = availableCharacters
+    .filter(char => char.order_idx === null || char.order_idx === undefined);
+  
+  if (unorderedAvailable.length > 0) {
+    const randomIndex = Math.floor(Math.random() * unorderedAvailable.length);
+    return unorderedAvailable[randomIndex].id;
+  }
+
+  addToast('Nenhum personagem disponível para o jogo nas categorias selecionadas.', 'error');
+  return null;
 }
 
-export async function startNewRound() {
+async function startNewCleanRound() {
   stopReveal();
-  Object.assign(imagemOcultaStore, initialRoundState());
+  Object.assign(imagemOcultaStore, initialRoundStateDefaults());
+  clearCurrentRoundStateFromLocalStorage();
 
-  // Garante que os personagens e scores sejam carregados antes de iniciar a rodada
-  if (imagemOcultaStore.characters.length === 0 && !imagemOcultaStore.isLoadingCharacters) {
-    await fetchCharacters();
-  }
-  if (!imagemOcultaStore.isLoadingScores) {
-    await fetchScores();
-  }
-  
-  if (imagemOcultaStore.characters.length > 0) {
-    imagemOcultaStore.currentRoundCharacter = pickRandomCharacter();
-    imagemOcultaStore.gameStatus = 'hint';
-  } else {
-    addToast('Não foi possível iniciar a rodada: nenhum personagem carregado.', 'error');
+  await fetchCharacters(); 
+
+  if (imagemOcultaStore.characters.length === 0) {
+    addToast('Não foi possível iniciar a rodada: nenhum personagem carregado com as categorias selecionadas. Verifique as categorias ou o servidor!', 'error');
     imagemOcultaStore.gameStatus = 'idle';
+    return;
   }
+
+  const nextCharacterId = pickNextCharacterId();
+  if (nextCharacterId) {
+    const nextCharacter = imagemOcultaStore.characters.find(char => char.id === nextCharacterId);
+    if (nextCharacter) {
+      imagemOcultaStore.currentRoundCharacter = nextCharacter;
+      imagemOcultaStore.gameStatus = 'hint';
+      saveCurrentRoundStateToLocalStorage();
+    } else {
+      addToast('Erro interno: Personagem escolhido não encontrado na lista (após seleção de ID).', 'error');
+      imagemOcultaStore.gameStatus = 'idle';
+      clearCurrentRoundStateFromLocalStorage();
+    }
+  } else {
+    addToast('Não foi possível selecionar um personagem para a rodada com as categorias atuais.', 'error');
+    imagemOcultaStore.gameStatus = 'idle';
+    clearCurrentRoundStateFromLocalStorage();
+  }
+}
+
+export async function initializeGame() {
+  await fetchCharacters();
+
+  if (!scoreStore.isLoadingScores) {
+    await fetchScores(); 
+  }
+
+  const savedRoundState = loadCurrentRoundStateFromLocalStorage();
+  
+  const areCategoriesTheSame = savedRoundState && 
+                               savedRoundState.selectedCategoryIds.length === imagemOcultaStore.selectedCategoryIds.length &&
+                               savedRoundState.selectedCategoryIds.every((id, index) => id === imagemOcultaStore.selectedCategoryIds[index]);
+
+  if (savedRoundState && savedRoundState.currentRoundCharacterId && 
+      savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle' &&
+      areCategoriesTheSame
+      ) {
+    const prevChar = imagemOcultaStore.characters.find(char => char.id === savedRoundState.currentRoundCharacterId);
+    if (prevChar) {
+      imagemOcultaStore.currentRoundCharacter = prevChar;
+      imagemOcultaStore.revealProgress = savedRoundState.revealProgress;
+      imagemOcultaStore.gameStatus = savedRoundState.gameStatus;
+      imagemOcultaStore.activeTeam = savedRoundState.activeTeam;
+
+      if (imagemOcultaStore.gameStatus === 'revealing') {
+        proceedToReveal();
+      }
+    } else {
+      clearCurrentRoundStateFromLocalStorage(); 
+      await startNewCleanRound();
+    }
+  } else {
+    await startNewCleanRound(); 
+  }
+}
+
+export async function startNextGameRound() {
+  await startNewCleanRound();
 }
 
 export function proceedToReveal() {
@@ -119,14 +291,26 @@ export function proceedToReveal() {
     addToast('Erro: Nenhum personagem selecionado para iniciar a revelação.', 'error');
     return;
   }
+  stopReveal(); 
+
   imagemOcultaStore.gameStatus = 'revealing';
+  const startTime = Date.now() - (imagemOcultaStore.revealProgress * REVEAL_DURATION_MS); 
+
   revealInterval = setInterval(() => {
-    imagemOcultaStore.revealProgress += REVEAL_STEP_MS / REVEAL_DURATION_MS;
+    const elapsedTime = Date.now() - startTime;
+    imagemOcultaStore.revealProgress = Math.min(elapsedTime / REVEAL_DURATION_MS, 1);
+    saveCurrentRoundStateToLocalStorage();
+
     if (imagemOcultaStore.revealProgress >= 1) {
       imagemOcultaStore.revealProgress = 1;
-      stopReveal();
-      imagemOcultaStore.gameStatus = 'finished';
-      addToast(`Tempo esgotado! A imagem completa era: <strong>${imagemOcultaStore.currentRoundCharacter?.name}</strong>`, 'info');
+      stopReveal(); 
+      imagemOcultaStore.gameStatus = 'finished'; 
+      if (imagemOcultaStore.currentRoundCharacter) {
+        imagemOcultaStore.playedCharacterIds.push(imagemOcultaStore.currentRoundCharacter.id);
+        savePlayedCharacterIds(imagemOcultaStore.playedCharacterIds);
+      }
+      clearCurrentRoundStateFromLocalStorage(); 
+      addToast(`Tempo esgotado! Resposta: <strong>${imagemOcultaStore.currentRoundCharacter?.name}</strong>`, 'info');
     }
   }, REVEAL_STEP_MS) as unknown as number;
 }
@@ -140,14 +324,16 @@ export function stopReveal() {
 
 export function selectTeam(team: TeamColor) {
   if (imagemOcultaStore.gameStatus === 'revealing') {
-    stopReveal();
+    stopReveal(); 
     imagemOcultaStore.activeTeam = team;
     imagemOcultaStore.gameStatus = 'guessing';
+    saveCurrentRoundStateToLocalStorage(); 
     addToast(`Equipe <strong>${team}</strong> irá palpitar!`, 'info');
+  } else {
+    console.warn('--- [SelectTeam] Tentativa de selecionar equipe em gameStatus inválido:', imagemOcultaStore.gameStatus);
   }
 }
 
-// ATUALIZADO: handleOperatorFeedback agora é assíncrono e interage com a API
 export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: number) {
   if (!imagemOcultaStore.activeTeam || !imagemOcultaStore.currentRoundCharacter) {
     console.warn("Feedback do operador recebido em um estado inválido ou sem time ativo.");
@@ -155,26 +341,8 @@ export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: n
   }
 
   if (isCorrect) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/scores/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team: imagemOcultaStore.activeTeam, pointsToAdd: scoreAwarded }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP ao atualizar pontuação: ${response.status}`);
-      }
-      // Não precisamos do retorno do JSON aqui, apenas confirmamos o sucesso
-      // const result = await response.json(); 
-      
-      // Atualiza o frontend após sucesso da API
-      imagemOcultaStore.score[imagemOcultaStore.activeTeam] += scoreAwarded;
-      addToast(`�� Equipe <strong>${imagemOcultaStore.activeTeam}</strong> acertou! Ganhou <strong>${scoreAwarded}</strong> pontos!`, 'success');
-    } catch (error) {
-      console.error('Falha ao atualizar pontuação no backend:', error);
-      addToast('Erro ao salvar pontuação no servidor! Tente novamente.', 'error');
-    }
+    await updateScore(imagemOcultaStore.activeTeam, scoreAwarded);
+    addToast(`🎉 Equipe <strong>${imagemOcultaStore.activeTeam}</strong> acertou! Ganhou <strong>${scoreAwarded}</strong> pontos!`, 'success');
   } else {
     addToast(`❌ Equipe <strong>${imagemOcultaStore.activeTeam}</strong> errou! A resposta correta era: <strong>${imagemOcultaStore.currentRoundCharacter.name}</strong>.`, 'error');
   }
@@ -182,37 +350,43 @@ export async function handleOperatorFeedback(isCorrect: boolean, scoreAwarded: n
   imagemOcultaStore.revealProgress = 1;
   imagemOcultaStore.gameStatus = 'finished';
   imagemOcultaStore.activeTeam = null;
+
+  if (imagemOcultaStore.currentRoundCharacter) {
+    imagemOcultaStore.playedCharacterIds.push(imagemOcultaStore.currentRoundCharacter.id);
+    savePlayedCharacterIds(imagemOcultaStore.playedCharacterIds);
+  }
+  clearCurrentRoundStateFromLocalStorage(); 
 }
 
 export function viewScoreboard() {
   imagemOcultaStore.gameStatus = 'scoreboard';
 }
 
-// ATUALIZADO: resetGameScores agora é assíncrono e interage com a API
 export async function resetGameScores() {
     stopReveal();
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/scores/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP ao resetar pontuações: ${response.status}`);
-      }
-      // const result = await response.json(); // Se precisar do feedback do servidor
-      addToast('Pontuações resetadas no servidor!', 'info');
-
-      // Reset frontend state only after successful backend reset
-      Object.assign(imagemOcultaStore.score, initialState.score); // Zera os scores locais
-      Object.assign(imagemOcultaStore, initialRoundState()); // Reseta o estado da rodada
-      imagemOcultaStore.gameStatus = 'idle';
-    } catch (error) {
-      console.error('Falha ao resetar pontuações no backend:', error);
-      addToast('Erro ao resetar pontuações no servidor! Tente novamente.', 'error');
-    }
+    await resetScores();
+    Object.assign(imagemOcultaStore, initialRoundStateDefaults());
+    imagemOcultaStore.playedCharacterIds = [];
+    savePlayedCharacterIds([]);
+    clearCurrentRoundStateFromLocalStorage(); 
+    imagemOcultaStore.gameStatus = 'idle';
 }
 
-// Chamadas iniciais para carregar personagens e scores quando o store é criado
-fetchCharacters();
-fetchScores();
+// === Watchers para persistência ===
+watch(() => imagemOcultaStore.gameStatus, (newVal, oldVal) => {
+  if (newVal !== oldVal) { 
+    saveCurrentRoundStateToLocalStorage(); 
+  }
+});
+
+watch(() => imagemOcultaStore.activeTeam, (newVal, oldVal) => {
+  if (newVal !== oldVal) { 
+    saveCurrentRoundStateToLocalStorage();
+  }
+});
+
+watch(() => imagemOcultaStore.currentRoundCharacter, (newVal, oldVal) => {
+    if (newVal !== oldVal) { 
+        saveCurrentRoundStateToLocalStorage();
+    }
+});

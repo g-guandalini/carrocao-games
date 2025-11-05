@@ -5,14 +5,14 @@
       @click="$emit('next-round')"
       class="action-button primary"
     >
-      Próxima Rodada ➡️
+      Próxima Rodada
     </button>
     <button
       v-if="gameStatus === 'finished' || gameStatus === 'scoreboard'"
       @click="$emit('reset-game')"
       class="action-button secondary"
     >
-      Reiniciar Jogo (Zerar Placar) ↩️
+      Voltar ao Menu
     </button>
   </div>
 </template>

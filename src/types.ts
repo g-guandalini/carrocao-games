@@ -105,6 +105,7 @@ export interface ConexaoGameState {
   isLoadingConexoes: boolean; // Estado de carregamento
   playedConexaoIds: string[]; // IDs das conexões já jogadas
   selectedCategoryIds: number[]; // IDs das categorias selecionadas
+  disabledTeams: Set<TeamColor>; // Conjunto de times desabilitados
 }
 // =========================================================
 //            FIM DA NOVA INTERFACE: ConexaoGameState

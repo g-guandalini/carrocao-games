@@ -1,21 +1,22 @@
 // src/store/conexaoStore.ts
-import { reactive, watch } from 'vue';
-import { ConexaoGameState, TeamColor, Conexao, GameStatus, Category } from '../types'; 
+import { reactive, watch, computed } from 'vue'; // <--- ADICIONADO: computed
+import { ConexaoGameState, TeamColor, Conexao, GameStatus, Category } from '../types';
 import { addToast } from './toastStore';
 import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
 
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const LOCAL_STORAGE_PLAYED_CONEXOES_KEY = 'conexaoGamePlayedConexoes';
 const LOCAL_STORAGE_CURRENT_CONEXAO_ROUND_STATE_KEY = 'conexaoCurrentRoundState';
 const LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY = 'conexaoSelectedCategories';
 
 interface SavedConexaoRoundState {
   currentRoundConexaoId: string | null;
-  revealedLettersCount: number; // Agora salva a contagem de letras reveladas
-  revealedLettersIndices: number[]; // Indices das letras reveladas
+  revealedLettersCount: number;
+  revealedLettersIndices: number[];
   gameStatus: GameStatus;
   activeTeam: TeamColor | null;
-  selectedCategoryIds: number[]; 
+  selectedCategoryIds: number[];
+  disabledTeams: TeamColor[];
 }
 
 // --- Funções auxiliares para localStorage ---
@@ -38,7 +39,7 @@ function loadPlayedConexaoIds(): string[] {
   }
 }
 
-function saveSelectedConexaoCategoryIds(ids: number[]) { 
+function saveSelectedConexaoCategoryIds(ids: number[]) {
     try {
         localStorage.setItem(LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY, JSON.stringify(ids));
     } catch (e) {
@@ -46,7 +47,7 @@ function saveSelectedConexaoCategoryIds(ids: number[]) {
     }
 }
 
-function loadSelectedConexaoCategoryIds(): number[] { 
+function loadSelectedConexaoCategoryIds(): number[] {
     try {
         const stored = localStorage.getItem(LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY);
         const ids = stored ? JSON.parse(stored) : [];
@@ -58,16 +59,17 @@ function loadSelectedConexaoCategoryIds(): number[] {
 }
 
 function saveCurrentConexaoRoundStateToLocalStorage() {
-  if (conexaoStore.currentRoundConexao && 
-      conexaoStore.gameStatus !== 'finished' && 
-      conexaoStore.gameStatus !== 'idle') { 
+  if (conexaoStore.currentRoundConexao &&
+      conexaoStore.gameStatus !== 'finished' &&
+      conexaoStore.gameStatus !== 'idle') {
     const stateToSave: SavedConexaoRoundState = {
       currentRoundConexaoId: conexaoStore.currentRoundConexao.id,
       revealedLettersCount: conexaoStore.revealedLettersCount,
-      revealedLettersIndices: Array.from(conexaoStore.currentRoundConexao.revealedLetters || new Set()), // Salva os índices
+      revealedLettersIndices: Array.from(conexaoStore.currentRoundConexao.revealedLetters || new Set()),
       gameStatus: conexaoStore.gameStatus,
       activeTeam: conexaoStore.activeTeam,
       selectedCategoryIds: conexaoStore.selectedCategoryIds,
+      disabledTeams: Array.from(conexaoStore.disabledTeams),
     };
     try {
       localStorage.setItem(LOCAL_STORAGE_CURRENT_CONEXAO_ROUND_STATE_KEY, JSON.stringify(stateToSave));
@@ -85,6 +87,9 @@ function loadCurrentConexaoRoundStateFromLocalStorage(): SavedConexaoRoundState 
     const state = stored ? JSON.parse(stored) : null;
     if (state && state.selectedCategoryIds) {
         state.selectedCategoryIds = state.selectedCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    }
+    if (state && !state.disabledTeams) {
+        state.disabledTeams = [];
     }
     return state;
   } catch (e) {
@@ -107,58 +112,72 @@ const initialConexaoRoundStateDefaults = () => ({
   revealedLettersCount: 0,
   gameStatus: 'idle' as GameStatus,
   activeTeam: null as TeamColor | null,
+  disabledTeams: new Set<TeamColor>(),
 });
 
-const initialState: ConexaoGameState = { // Usa ConexaoGameState
+const initialState: ConexaoGameState = {
   ...initialConexaoRoundStateDefaults(),
   conexoes: [],
   isLoadingConexoes: false,
   playedConexaoIds: loadPlayedConexaoIds(),
-  selectedCategoryIds: loadSelectedConexaoCategoryIds(), 
+  selectedCategoryIds: loadSelectedConexaoCategoryIds(),
 };
 
 export const conexaoStore = reactive<ConexaoGameState>({ ...initialState });
 
-let revealImageTimer: number | null = null; // Timer para a imagem (1 minuto)
-let revealLetterInterval: number | null = null; // Intervalo para revelar letras (a cada 6s)
+// <--- NOVO: Propriedade computada para a pontuação potencial atual da rodada --->
+export const currentRoundPotentialScore = computed(() => {
+  if (!conexaoStore.currentRoundConexao || conexaoStore.gameStatus === 'finished' || conexaoStore.gameStatus === 'idle') {
+    return 0;
+  }
+  // Garante que apenas letras são contadas, ignorando espaços.
+  const palavra = conexaoStore.currentRoundConexao.palavra.replace(/ /g, '');
+  const totalLetters = palavra.length;
+  const revealedLetters = conexaoStore.revealedLettersCount;
+  // Cálculo da pontuação: 10 pontos por cada letra total, menos 10 pontos por cada letra revelada. Mínimo 0.
+  return Math.max(0, (totalLetters * 10) - (revealedLetters * 10));
+});
 
-const REVEAL_IMAGE_DURATION_MS = 60000; // 1 minuto
-const REVEAL_LETTER_STEP_MS = 6000; // 6 segundos
+
+let revealImageTimer: number | null = null;
+let revealLetterInterval: number | null = null;
+
+const REVEAL_IMAGE_DURATION_MS = 120000; // <--- ALTERADO: 2 minutos (120 segundos)
+const REVEAL_LETTER_STEP_MS = 10000;     // <--- ALTERADO: 10 segundos
 
 // Interface para a resposta da API de Conexão
-interface ApiConexaoResponse { 
+interface ApiConexaoResponse {
   id: number;
   palavra: string;
   imageUrl: string;
   order_idx: number | null;
-  categories: Category[]; 
+  categories: Category[];
 }
 
-export async function fetchConexoes(categoryIds: number[] = conexaoStore.selectedCategoryIds): Promise<void> { 
+export async function fetchConexoes(categoryIds: number[] = conexaoStore.selectedCategoryIds): Promise<void> {
     conexaoStore.isLoadingConexoes = true;
     try {
-      let url = `${API_BASE_URL}/api/conexao`; // Ajustado para a rota de jogo
-      // Garante que categoryIds é um array e filtra valores nulos/undefined se houver
-      const actualCategoryIds = categoryIds?.filter(id => id != null) || []; 
-  
+      let url = `${API_BASE_URL}/api/conexao`;
+      const actualCategoryIds = categoryIds?.filter(id => id != null) || [];
+
       if (actualCategoryIds.length > 0) {
         url += `?categoryIds=${actualCategoryIds.join(',')}`;
       }
-  
+
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Erro HTTP: ${response.status}`);
       }
-      const data: ApiConexaoResponse[] = await response.json(); 
-      
+      const data: ApiConexaoResponse[] = await response.json();
+
       conexaoStore.conexoes = data.map(item => ({
-        id: String(item.id), 
-        palavra: item.palavra,   
+        id: String(item.id),
+        palavra: item.palavra,
         imageUrl: item.imageUrl,
         order_idx: item.order_idx,
-        revealedLetters: new Set<number>(), // Inicializa um Set vazio para cada conexão
+        revealedLetters: new Set<number>(),
       }));
-      
+
     } catch (error) {
       console.error('[FetchConexoes] Falha ao buscar conexões:', error);
       addToast('Erro ao carregar conexões do servidor!', 'error');
@@ -168,7 +187,7 @@ export async function fetchConexoes(categoryIds: number[] = conexaoStore.selecte
     }
   }
 
-export function setSelectedConexaoCategories(ids: number[]) { 
+export function setSelectedConexaoCategories(ids: number[]) {
     conexaoStore.selectedCategoryIds = ids;
     saveSelectedConexaoCategoryIds(ids);
     conexaoStore.playedConexaoIds = [];
@@ -179,25 +198,25 @@ function pickNextConexaoId(): string | null {
   let availableConexoes = conexaoStore.conexoes.filter(
     (con) => !conexaoStore.playedConexaoIds.includes(con.id)
   );
-  
+
   if (availableConexoes.length === 0) {
     conexaoStore.playedConexaoIds = [];
     savePlayedConexaoIds([]);
-    availableConexoes = conexaoStore.conexoes; 
+    availableConexoes = conexaoStore.conexoes;
     addToast('Todas as conexões das categorias selecionadas foram jogadas. Reiniciando a lista para novas rodadas.', 'info');
   }
 
   const orderedAvailable = availableConexoes
     .filter(con => con.order_idx !== null && con.order_idx !== undefined)
-    .sort((a, b) => (a.order_idx || Infinity) - (b.order_idx || Infinity)); 
-  
+    .sort((a, b) => (a.order_idx || Infinity) - (b.order_idx || Infinity));
+
   if (orderedAvailable.length > 0) {
     return orderedAvailable[0].id;
   }
 
   const unorderedAvailable = availableConexoes
     .filter(con => con.order_idx === null || con.order_idx === undefined);
-  
+
   if (unorderedAvailable.length > 0) {
     const randomIndex = Math.floor(Math.random() * unorderedAvailable.length);
     return unorderedAvailable[randomIndex].id;
@@ -212,7 +231,7 @@ async function startNewCleanConexaoRound() {
   Object.assign(conexaoStore, initialConexaoRoundStateDefaults());
   clearCurrentConexaoRoundStateFromLocalStorage();
 
-  await fetchConexoes(); 
+  await fetchConexoes();
 
   if (conexaoStore.conexoes.length === 0) {
     addToast('Não foi possível iniciar a rodada: nenhuma conexão carregada com as categorias selecionadas. Verifique as categorias ou o servidor!', 'error');
@@ -225,8 +244,10 @@ async function startNewCleanConexaoRound() {
     const nextConexao = conexaoStore.conexoes.find(con => con.id === nextConexaoId);
     if (nextConexao) {
       conexaoStore.currentRoundConexao = nextConexao;
-      conexaoStore.gameStatus = 'revealing'; // Começa diretamente revelando letras
-      startImageAndLetterRevelation(); // Inicia os timers
+      conexaoStore.gameStatus = 'revealing';
+      // <--- ALTERADO: Nenhuma letra revelada imediatamente no início da rodada.
+      // A primeira letra será revelada após o primeiro REVEAL_LETTER_STEP_MS.
+      startImageAndLetterRevelation(false);
       saveCurrentConexaoRoundStateToLocalStorage();
     } else {
       addToast('Erro interno: Conexão escolhida não encontrada na lista (após seleção de ID).', 'error');
@@ -240,47 +261,48 @@ async function startNewCleanConexaoRound() {
   }
 }
 
-export async function initializeConexaoGame() { 
+export async function initializeConexaoGame() {
   await fetchConexoes();
 
   if (!scoreStore.isLoadingScores) {
-    await fetchScores(); 
+    await fetchScores();
   }
 
   const savedRoundState = loadCurrentConexaoRoundStateFromLocalStorage();
-  
-  const areCategoriesTheSame = savedRoundState && 
+
+  const areCategoriesTheSame = savedRoundState &&
                                savedRoundState.selectedCategoryIds.length === conexaoStore.selectedCategoryIds.length &&
                                savedRoundState.selectedCategoryIds.every((id, index) => id === conexaoStore.selectedCategoryIds[index]);
 
-  if (savedRoundState && savedRoundState.currentRoundConexaoId && 
+  if (savedRoundState && savedRoundState.currentRoundConexaoId &&
       savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle' &&
       areCategoriesTheSame
       ) {
     const prevConexao = conexaoStore.conexoes.find(con => con.id === savedRoundState.currentRoundConexaoId);
     if (prevConexao) {
-      // Reconstitui o Set de letras reveladas a partir dos índices salvos
       prevConexao.revealedLetters = new Set(savedRoundState.revealedLettersIndices || []);
 
       conexaoStore.currentRoundConexao = prevConexao;
       conexaoStore.revealedLettersCount = savedRoundState.revealedLettersCount;
       conexaoStore.gameStatus = savedRoundState.gameStatus;
       conexaoStore.activeTeam = savedRoundState.activeTeam;
+      conexaoStore.disabledTeams = new Set(savedRoundState.disabledTeams || []);
 
-      // Se o jogo estava em revelação, retoma os timers
       if (conexaoStore.gameStatus === 'revealing') {
-        startImageAndLetterRevelation(true); // 'true' para retomar o estado salvo
+        // Ao carregar um estado salvo, a revelação de letras deve continuar do ponto salvo,
+        // começando o intervalo a partir do zero, sem revelar uma letra imediatamente.
+        startImageAndLetterRevelation(false);
       }
     } else {
-      clearCurrentConexaoRoundStateFromLocalStorage(); 
+      clearCurrentConexaoRoundStateFromLocalStorage();
       await startNewCleanConexaoRound();
     }
   } else {
-    await startNewCleanConexaoRound(); 
+    await startNewCleanConexaoRound();
   }
 }
 
-export async function startNextConexaoGameRound() { 
+export async function startNextConexaoGameRound() {
   await startNewCleanConexaoRound();
 }
 
@@ -306,7 +328,7 @@ function revealRandomLetter() {
 
   const unrevealedIndices: number[] = [];
   for (let i = 0; i < palavra.length; i++) {
-    if (palavra[i] !== ' ' && !currentRevealed.has(i)) { // Ignora espaços e já reveladas
+    if (palavra[i] !== ' ' && !currentRevealed.has(i)) {
       unrevealedIndices.push(i);
     }
   }
@@ -315,12 +337,11 @@ function revealRandomLetter() {
     const randomIndex = Math.floor(Math.random() * unrevealedIndices.length);
     const indexToReveal = unrevealedIndices[randomIndex];
     currentRevealed.add(indexToReveal);
-    conexaoStore.revealedLettersCount = currentRevealed.size; // Atualiza a contagem
-    conexaoStore.currentRoundConexao.revealedLetters = currentRevealed; // Atualiza o Set reativamente
+    conexaoStore.revealedLettersCount = currentRevealed.size;
+    conexaoStore.currentRoundConexao.revealedLetters = currentRevealed;
 
     saveCurrentConexaoRoundStateToLocalStorage();
 
-    // Verifica se todas as letras foram reveladas
     const totalLetters = palavra.replace(/ /g, '').length;
     if (currentRevealed.size >= totalLetters) {
         stopConexaoTimers();
@@ -329,7 +350,6 @@ function revealRandomLetter() {
         clearCurrentConexaoRoundStateFromLocalStorage();
     }
   } else {
-    // Todas as letras já foram reveladas ou não há letras para revelar
     stopConexaoTimers();
     conexaoStore.gameStatus = 'finished';
     addToast(`Todas as letras foram reveladas! Resposta: <strong>${palavra}</strong>`, 'info');
@@ -338,16 +358,17 @@ function revealRandomLetter() {
 }
 
 
-export function startImageAndLetterRevelation(resuming: boolean = false) { 
+export function startImageAndLetterRevelation(shouldRevealFirstLetterImmediately: boolean = true) {
   if (!conexaoStore.currentRoundConexao) {
     addToast('Erro: Nenhuma conexão selecionada para iniciar a revelação.', 'error');
     return;
   }
-  stopConexaoTimers(); // Limpa timers existentes
+  stopConexaoTimers();
 
-  conexaoStore.gameStatus = 'revealing';
+  if (conexaoStore.gameStatus !== 'guessing') {
+      conexaoStore.gameStatus = 'revealing';
+  }
 
-  // --- Timer principal para a imagem (1 minuto) ---
   revealImageTimer = setTimeout(() => {
     stopConexaoTimers();
     conexaoStore.gameStatus = 'finished';
@@ -355,9 +376,7 @@ export function startImageAndLetterRevelation(resuming: boolean = false) {
     clearCurrentConexaoRoundStateFromLocalStorage();
   }, REVEAL_IMAGE_DURATION_MS) as unknown as number;
 
-  // --- Intervalo para revelar letras (a cada 6 segundos) ---
-  // Revela uma letra imediatamente se não estiver retomando o jogo
-  if (!resuming) {
+  if (shouldRevealFirstLetterImmediately) {
     revealRandomLetter();
   }
   revealLetterInterval = setInterval(revealRandomLetter, REVEAL_LETTER_STEP_MS) as unknown as number;
@@ -365,12 +384,15 @@ export function startImageAndLetterRevelation(resuming: boolean = false) {
 
 
 export function selectConexaoTeam(team: TeamColor) {
+  if (conexaoStore.disabledTeams.has(team)) {
+      return;
+  }
+
   if (conexaoStore.gameStatus === 'revealing') {
-    stopConexaoTimers(); // Para os timers quando um time palpitar
+    stopConexaoTimers();
     conexaoStore.activeTeam = team;
     conexaoStore.gameStatus = 'guessing';
-    saveCurrentConexaoRoundStateToLocalStorage(); 
-    addToast(`Equipe <strong>${team}</strong> irá palpitar!`, 'info');
+    saveCurrentConexaoRoundStateToLocalStorage();
   } else {
     console.warn('--- [selectConexaoTeam] Tentativa de selecionar equipe em gameStatus inválido:', conexaoStore.gameStatus);
   }
@@ -382,60 +404,85 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
     return;
   }
 
-  let finalScore = 0;
+  const currentActiveTeam = conexaoStore.activeTeam;
+  const currentConexaoPalavra = conexaoStore.currentRoundConexao.palavra;
+
+  stopConexaoTimers();
+
   if (isCorrect) {
-    // Calcula a pontuação: 10 pontos por letra, menos 10 por cada letra revelada
-    const palavra = conexaoStore.currentRoundConexao.palavra.replace(/ /g, ''); // Ignora espaços
-    const totalLetters = palavra.length;
-    const revealedLetters = conexaoStore.revealedLettersCount; // Contagem já considera apenas letras não-espaço
+    // A pontuação agora é calculada usando a propriedade computada atualizada
+    const finalScore = currentRoundPotentialScore.value; // <--- ALTERADO: Usa a propriedade computada
 
-    finalScore = Math.max(0, (totalLetters * 10) - (revealedLetters * 10)); // Garante pontuação mínima de 0
+    await updateScore(currentActiveTeam, finalScore);
+    addToast(`🎉 Equipe <strong>${currentActiveTeam}</strong> acertou! Ganhou <strong>${finalScore}</strong> pontos!`, 'success');
 
-    await updateScore(conexaoStore.activeTeam, finalScore);
-    addToast(`🎉 Equipe <strong>${conexaoStore.activeTeam}</strong> acertou! Ganhou <strong>${finalScore}</strong> pontos!`, 'success');
+    conexaoStore.gameStatus = 'finished';
+    conexaoStore.activeTeam = null;
+
+    if (conexaoStore.currentRoundConexao) {
+      conexaoStore.playedConexaoIds.push(conexaoStore.currentRoundConexao.id);
+      savePlayedConexaoIds(conexaoStore.playedConexaoIds);
+    }
+    clearCurrentConexaoRoundStateFromLocalStorage();
+
   } else {
-    addToast(`❌ Equipe <strong>${conexaoStore.activeTeam}</strong> errou! A resposta correta era: <strong>${conexaoStore.currentRoundConexao.palavra}</strong>.`, 'error');
-  }
-  
-  stopConexaoTimers(); // Garante que os timers param
-  conexaoStore.gameStatus = 'finished';
-  conexaoStore.activeTeam = null;
+    addToast(`❌ Equipe <strong>${currentActiveTeam}</strong> errou! O jogo continua...`, 'error');
 
-  if (conexaoStore.currentRoundConexao) {
-    conexaoStore.playedConexaoIds.push(conexaoStore.currentRoundConexao.id);
-    savePlayedConexaoIds(conexaoStore.playedConexaoIds);
+    conexaoStore.disabledTeams.add(currentActiveTeam);
+    conexaoStore.activeTeam = null;
+
+    const allTeamColors = Object.values(TeamColor);
+    const remainingTeams = allTeamColors.filter(team => !conexaoStore.disabledTeams.has(team));
+
+    if (remainingTeams.length === 0) {
+        addToast(`Todas as equipes erraram! A resposta correta era: <strong>${currentConexaoPalavra}</strong>.`, 'info');
+        conexaoStore.gameStatus = 'finished';
+        clearCurrentConexaoRoundStateFromLocalStorage();
+    } else {
+        conexaoStore.gameStatus = 'revealing';
+        // <--- ALTERADO: Ao retomar a revelação após um erro, não revelar uma letra imediatamente.
+        startImageAndLetterRevelation(false);
+        saveCurrentConexaoRoundStateToLocalStorage();
+    }
   }
-  clearCurrentConexaoRoundStateFromLocalStorage(); 
 }
 
 export function viewConexaoScoreboard() {
   conexaoStore.gameStatus = 'scoreboard';
 }
 
-export async function resetConexaoGameScores() { 
+export async function resetConexaoGameScores() {
     stopConexaoTimers();
     Object.assign(conexaoStore, initialConexaoRoundStateDefaults());
     conexaoStore.playedConexaoIds = [];
     savePlayedConexaoIds([]);
-    clearCurrentConexaoRoundStateFromLocalStorage(); 
+    clearCurrentConexaoRoundStateFromLocalStorage();
     conexaoStore.gameStatus = 'idle';
 }
 
 // === Watchers para persistência ===
 watch(() => conexaoStore.gameStatus, (newVal, oldVal) => {
-  if (newVal !== oldVal) { 
-    saveCurrentConexaoRoundStateToLocalStorage(); 
+  if (newVal !== oldVal) {
+    saveCurrentConexaoRoundStateToLocalStorage();
   }
 });
 
 watch(() => conexaoStore.activeTeam, (newVal, oldVal) => {
-  if (newVal !== oldVal) { 
+  if (newVal !== oldVal) {
     saveCurrentConexaoRoundStateToLocalStorage();
   }
 });
 
 watch(() => conexaoStore.currentRoundConexao, (newVal, oldVal) => {
-    if (newVal !== oldVal) { 
+    if (newVal !== oldVal) {
         saveCurrentConexaoRoundStateToLocalStorage();
     }
-}, { deep: true }); // Watch profundo para alterações em revealedLetters
+}, { deep: true });
+
+watch(() => conexaoStore.disabledTeams, (newVal, oldVal) => {
+  const areEqual = newVal.size === oldVal.size &&
+                   Array.from(newVal).every(item => oldVal.has(item));
+  if (!areEqual) {
+    saveCurrentConexaoRoundStateToLocalStorage();
+  }
+}, { deep: true });

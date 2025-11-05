@@ -20,7 +20,7 @@
         Imagem Oculta
       </button>
       <!-- NOVO: Botão para Conexão -->
-      <button class="menu-button" @click="navigateToCategorySelection('conexao')">
+      <button class="menu-button primary" @click="navigateToCategorySelection('conexao')">
         Conexão
       </button>
       <button class="menu-button" @click="$emit('select-bug')">
@@ -95,13 +95,10 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
   max-width: 800px;
   min-height: 100vh;
-  justify-content: center;
   background-color: #f0f2f5;
   position: relative; 
-  padding-top: 60px; 
 }
 
 .admin-button {

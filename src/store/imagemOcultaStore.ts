@@ -4,7 +4,7 @@ import { ImagemOcultaGameState, TeamColor, Character, GameStatus, Category } fro
 import { addToast } from './toastStore';
 import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
 
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const LOCAL_STORAGE_PLAYED_CHARS_KEY = 'imagemOcultaGamePlayedChars';
 const LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY = 'imagemOcultaCurrentRoundState';
 const LOCAL_STORAGE_SELECTED_CATEGORIES_KEY = 'imagemOcultaSelectedCategories';
@@ -318,7 +318,6 @@ export function selectImagemOcultaTeam(team: TeamColor) {
     imagemOcultaStore.activeTeam = team;
     imagemOcultaStore.gameStatus = 'guessing';
     saveCurrentRoundStateToLocalStorage(); 
-    addToast(`Equipe <strong>${team}</strong> irá palpitar!`, 'info');
   } else {
     console.warn('--- [selectImagemOcultaTeam] Tentativa de selecionar equipe em gameStatus inválido:', imagemOcultaStore.gameStatus);
   }

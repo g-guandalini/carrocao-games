@@ -8,6 +8,8 @@
       :revealed-letters-count="conexaoStore.revealedLettersCount"
       :game-status="conexaoStore.gameStatus"
       :active-team="conexaoStore.activeTeam"
+      :disabled-teams="conexaoStore.disabledTeams"
+      :current-potential-score="currentRoundPotentialScore"
       @evaluate-guess="handleOperatorFeedback"
       @view-scoreboard="viewScoreboardFromGame"
     />
@@ -30,36 +32,36 @@
 
 <script lang="ts">
 import { defineComponent, onMounted, onUnmounted } from 'vue';
-import { 
-  conexaoStore, 
-  initializeConexaoGame, 
-  startNextConexaoGameRound, 
-  selectConexaoTeam, 
-  handleOperatorConexaoFeedback, 
-  resetConexaoGameScores, 
-  viewConexaoScoreboard 
+import {
+  conexaoStore,
+  initializeConexaoGame,
+  startNextConexaoGameRound,
+  selectConexaoTeam,
+  handleOperatorConexaoFeedback,
+  resetConexaoGameScores,
+  viewConexaoScoreboard,
+  currentRoundPotentialScore // <--- NOVO: Importando a propriedade computada
 } from '../store/conexaoStore';
 import { TeamColor } from '../types';
-import { useRouter } from 'vue-router'; 
+import { useRouter } from 'vue-router';
 
-// Componentes Compartilhados
 import GameHeader from '../components/GameHeader.vue';
 import ScoreboardScreen from '../components/ScoreboardScreen.vue';
-// Componente Específico do Jogo Conexão
-import GameConexao from '../components/GameConexao.vue'; 
+import GameConexao from '../components/GameConexao.vue';
 
 export default defineComponent({
   name: 'ConexaoView',
   components: {
     GameHeader,
-    GameConexao, 
+    GameConexao,
     ScoreboardScreen,
   },
   setup() {
-    const router = useRouter(); 
+    const router = useRouter();
 
     const handleOperatorFeedback = (isCorrect: boolean, scoreAwarded: number) => {
       console.log(`[ConexaoView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
+      // scoreAwarded não é mais usado aqui, pois o cálculo é feito no store
       handleOperatorConexaoFeedback(isCorrect, scoreAwarded);
     };
 
@@ -74,31 +76,31 @@ export default defineComponent({
         }
 
         if (selectedTeam) {
-          event.preventDefault(); 
-          selectConexaoTeam(selectedTeam); 
+          event.preventDefault();
+          selectConexaoTeam(selectedTeam);
         }
       }
     };
 
     const viewScoreboardFromGame = () => {
-      viewConexaoScoreboard(); 
+      viewConexaoScoreboard();
     };
-    
+
     const handleNextRoundFromScoreboard = () => {
       console.log('[ConexaoView] handleNextRoundFromScoreboard: Chamando startNextConexaoGameRound()...');
-      startNextConexaoGameRound(); 
+      startNextConexaoGameRound();
     };
 
     const handleResetGame = () => {
       console.log('[ConexaoView] handleResetGame: Chamando resetConexaoGameScores()...');
-      resetConexaoGameScores(); 
-      router.push({ name: 'Home' }); 
+      resetConexaoGameScores();
+      router.push({ name: 'Home' });
     };
 
     onMounted(() => {
       document.addEventListener('keydown', handleGlobalKeyDown);
       console.log('[ConexaoView] onMounted: Chamando initializeConexaoGame()...');
-      initializeConexaoGame(); 
+      initializeConexaoGame();
     });
 
     onUnmounted(() => {
@@ -106,18 +108,19 @@ export default defineComponent({
     });
 
     return {
-      conexaoStore, 
-      handleNextRoundFromScoreboard, 
+      conexaoStore,
+      handleNextRoundFromScoreboard,
       handleOperatorFeedback,
       viewScoreboardFromGame,
       handleResetGame,
+      currentRoundPotentialScore, // <--- NOVO: Expondo a propriedade computada
     };
   },
 });
 </script>
 
 <style scoped>
-.conexao-game-wrapper { 
+.conexao-game-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;

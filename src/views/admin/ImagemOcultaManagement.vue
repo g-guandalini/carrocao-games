@@ -167,9 +167,9 @@ export default defineComponent({
     const selectedFile = ref<File | null>(null); 
     const imagePreviewUrl = ref<string | null>(null); 
 
-    const baseURL = 'http://localhost:3001'; 
+    const baseURL = import.meta.env.VITE_API_BASE_URL; 
 
-    const API_BASE_URL = 'http://localhost:3001/api/admin'; 
+    const API_BASE_URL = baseURL + '/api/admin'; 
     const IMAGEM_OCULTA_API_URL = `${API_BASE_URL}/imagem-oculta`;
     const CATEGORIES_API_URL = `${API_BASE_URL}/categories`;
 

@@ -110,12 +110,10 @@
   .answer-feedback-container {
     display: flex;
     gap: 30px; /* Espaço entre os botões */
-    margin-top: 40px;
     justify-content: center;
     width: 100%;
     max-width: 600px; /* Limita a largura do container */
     padding: 20px;
-    background-color: #f0f0f0; /* Fundo sutil */
     border-radius: 15px;
     cursor: crosshair; /* Um cursor mais proeminente para o suspense */
     /* Se você quiser um cursor personalizado maior, precisará de uma imagem: */

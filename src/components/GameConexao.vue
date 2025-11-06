@@ -1,3 +1,4 @@
+// GameConexao.vue
 <template>
   <div class="game-conexao-container">
     <!-- Imagem da Conexão -->
@@ -13,8 +14,6 @@
             <h2>{{ currentRoundConexao?.palavra }}</h2>
         </div>
     </div>
-
-    <!-- <--- REMOVIDO: Exibição de pontos da rodada. --->
 
     <!-- Palavra sendo revelada -->
     <div class="word-display">
@@ -32,7 +31,6 @@
             </p>
         </div>
 
-        <!-- <--- ALTERADO: Novo texto para o estado 'guessing' --->
         <div v-if="gameStatus === 'guessing' && activeTeam" class="guessing-state">
             <p class="guessing-message">
                 Aguardando resposta da equipe <strong :style="{ color: teamColorToHex(activeTeam) }">{{ activeTeam }}</strong>! ⏳
@@ -45,7 +43,6 @@
                 @wrong-answer="evaluateGuess(false, 0)"
             />
         </div>
-        <!-- <--- FIM DA ALTERAÇÃO --->
 
         <div v-if="gameStatus === 'finished'" class="finished-state">
             <button @click="viewConexaoScoreboard" class="btn-action info">Ver Placar</button>
@@ -112,6 +109,12 @@ export default defineComponent({
     const formattedPalavra = computed(() => {
         if (!props.currentRoundConexao || !props.currentRoundConexao.palavra) return '';
         const palavra = props.currentRoundConexao.palavra.toUpperCase();
+
+        // NOVO: Se o jogo terminou, mostra a palavra completa
+        if (props.gameStatus === 'finished') {
+            return palavra;
+        }
+
         const revealed = props.currentRoundConexao.revealedLetters || new Set<number>();
 
         return palavra.split('').map((char, index) => {
@@ -203,8 +206,6 @@ export default defineComponent({
     opacity: 0.8;
 }
 
-/* <--- REMOVIDO: Estilo para a exibição da pontuação atual (current-score-display) ---> */
-
 .word-display {
     font-family: 'Monospace', monospace;
     font-size: 3em;
@@ -215,7 +216,7 @@ export default defineComponent({
     flex-wrap: wrap;
     justify-content: center;
     gap: 5px;
-    margin-top: 20px; /* Adicionar um pouco de margem superior se a pontuação for removida daqui */
+    margin-top: 20px;
 }
 
 .letter {
@@ -277,11 +278,10 @@ export default defineComponent({
   transform: translateY(-2px);
 }
 
-/* <--- NOVO: Estilos para o estado 'guessing' ---> */
 .guessing-text-status {
   font-size: 1.4em;
   font-weight: bold;
-  margin-bottom: 5px; /* Espaçamento entre as duas linhas de texto */
+  margin-bottom: 5px;
 }
 .guessing-text-score {
   font-size: 1.2em;
@@ -297,7 +297,6 @@ export default defineComponent({
 .guessing-text-status .red { color: #dc3545; }
 .guessing-text-status .green { color: #28a745; }
 .guessing-text-status .yellow { color: #ffc107; }
-/* <--- FIM DOS NOVOS ESTILOS ---> */
 
 @media (max-width: 768px) {
   .game-conexao-container {

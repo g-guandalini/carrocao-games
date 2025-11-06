@@ -1,5 +1,5 @@
 // src/store/conexaoStore.ts
-import { reactive, watch, computed } from 'vue'; // <--- ADICIONADO: computed
+import { reactive, watch, computed } from 'vue';
 import { ConexaoGameState, TeamColor, Conexao, GameStatus, Category } from '../types';
 import { addToast } from './toastStore';
 import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
@@ -59,9 +59,7 @@ function loadSelectedConexaoCategoryIds(): number[] {
 }
 
 function saveCurrentConexaoRoundStateToLocalStorage() {
-  if (conexaoStore.currentRoundConexao &&
-      conexaoStore.gameStatus !== 'finished' &&
-      conexaoStore.gameStatus !== 'idle') {
+  if (conexaoStore.currentRoundConexao) {
     const stateToSave: SavedConexaoRoundState = {
       currentRoundConexaoId: conexaoStore.currentRoundConexao.id,
       revealedLettersCount: conexaoStore.revealedLettersCount,
@@ -76,8 +74,6 @@ function saveCurrentConexaoRoundStateToLocalStorage() {
     } catch (e) {
       console.error('Erro ao salvar estado da rodada atual de Conexão no localStorage:', e);
     }
-  } else {
-    clearCurrentConexaoRoundStateFromLocalStorage();
   }
 }
 
@@ -125,16 +121,13 @@ const initialState: ConexaoGameState = {
 
 export const conexaoStore = reactive<ConexaoGameState>({ ...initialState });
 
-// <--- NOVO: Propriedade computada para a pontuação potencial atual da rodada --->
 export const currentRoundPotentialScore = computed(() => {
   if (!conexaoStore.currentRoundConexao || conexaoStore.gameStatus === 'finished' || conexaoStore.gameStatus === 'idle') {
     return 0;
   }
-  // Garante que apenas letras são contadas, ignorando espaços.
   const palavra = conexaoStore.currentRoundConexao.palavra.replace(/ /g, '');
   const totalLetters = palavra.length;
   const revealedLetters = conexaoStore.revealedLettersCount;
-  // Cálculo da pontuação: 10 pontos por cada letra total, menos 10 pontos por cada letra revelada. Mínimo 0.
   return Math.max(0, (totalLetters * 10) - (revealedLetters * 10));
 });
 
@@ -142,10 +135,9 @@ export const currentRoundPotentialScore = computed(() => {
 let revealImageTimer: number | null = null;
 let revealLetterInterval: number | null = null;
 
-const REVEAL_IMAGE_DURATION_MS = 120000; // <--- ALTERADO: 2 minutos (120 segundos)
-const REVEAL_LETTER_STEP_MS = 10000;     // <--- ALTERADO: 10 segundos
+const REVEAL_IMAGE_DURATION_MS = import.meta.env.VITE_TEMPO_RODADA_CONEXAO;
+const REVEAL_LETTER_STEP_MS = import.meta.env.VITE_TEMPO_LETRA_CONEXAO;
 
-// Interface para a resposta da API de Conexão
 interface ApiConexaoResponse {
   id: number;
   palavra: string;
@@ -245,8 +237,6 @@ async function startNewCleanConexaoRound() {
     if (nextConexao) {
       conexaoStore.currentRoundConexao = nextConexao;
       conexaoStore.gameStatus = 'revealing';
-      // <--- ALTERADO: Nenhuma letra revelada imediatamente no início da rodada.
-      // A primeira letra será revelada após o primeiro REVEAL_LETTER_STEP_MS.
       startImageAndLetterRevelation(false);
       saveCurrentConexaoRoundStateToLocalStorage();
     } else {
@@ -274,23 +264,16 @@ export async function initializeConexaoGame() {
                                savedRoundState.selectedCategoryIds.length === conexaoStore.selectedCategoryIds.length &&
                                savedRoundState.selectedCategoryIds.every((id, index) => id === conexaoStore.selectedCategoryIds[index]);
 
-  if (savedRoundState && savedRoundState.currentRoundConexaoId &&
-      savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle' &&
-      areCategoriesTheSame
-      ) {
+  if (savedRoundState && savedRoundState.currentRoundConexaoId && areCategoriesTheSame) {
     const prevConexao = conexaoStore.conexoes.find(con => con.id === savedRoundState.currentRoundConexaoId);
     if (prevConexao) {
-      prevConexao.revealedLetters = new Set(savedRoundState.revealedLettersIndices || []);
-
-      conexaoStore.currentRoundConexao = prevConexao;
+      conexaoStore.currentRoundConexao = { ...prevConexao, revealedLetters: new Set(savedRoundState.revealedLettersIndices || []) };
       conexaoStore.revealedLettersCount = savedRoundState.revealedLettersCount;
       conexaoStore.gameStatus = savedRoundState.gameStatus;
       conexaoStore.activeTeam = savedRoundState.activeTeam;
       conexaoStore.disabledTeams = new Set(savedRoundState.disabledTeams || []);
 
       if (conexaoStore.gameStatus === 'revealing') {
-        // Ao carregar um estado salvo, a revelação de letras deve continuar do ponto salvo,
-        // começando o intervalo a partir do zero, sem revelar uma letra imediatamente.
         startImageAndLetterRevelation(false);
       }
     } else {
@@ -347,13 +330,11 @@ function revealRandomLetter() {
         stopConexaoTimers();
         conexaoStore.gameStatus = 'finished';
         addToast(`Todas as letras foram reveladas! Resposta: <strong>${palavra}</strong>`, 'info');
-        clearCurrentConexaoRoundStateFromLocalStorage();
     }
   } else {
     stopConexaoTimers();
     conexaoStore.gameStatus = 'finished';
     addToast(`Todas as letras foram reveladas! Resposta: <strong>${palavra}</strong>`, 'info');
-    clearCurrentConexaoRoundStateFromLocalStorage();
   }
 }
 
@@ -373,7 +354,6 @@ export function startImageAndLetterRevelation(shouldRevealFirstLetterImmediately
     stopConexaoTimers();
     conexaoStore.gameStatus = 'finished';
     addToast(`Tempo esgotado para a imagem! Resposta: <strong>${conexaoStore.currentRoundConexao?.palavra}</strong>`, 'info');
-    clearCurrentConexaoRoundStateFromLocalStorage();
   }, REVEAL_IMAGE_DURATION_MS) as unknown as number;
 
   if (shouldRevealFirstLetterImmediately) {
@@ -405,13 +385,12 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
   }
 
   const currentActiveTeam = conexaoStore.activeTeam;
-  const currentConexaoPalavra = conexaoStore.currentRoundConexao.palavra;
+  // const currentConexaoPalavra = conexaoStore.currentRoundConexao.palavra; // Não será mais usada para finalizar aqui.
 
   stopConexaoTimers();
 
   if (isCorrect) {
-    // A pontuação agora é calculada usando a propriedade computada atualizada
-    const finalScore = currentRoundPotentialScore.value; // <--- ALTERADO: Usa a propriedade computada
+    const finalScore = currentRoundPotentialScore.value;
 
     await updateScore(currentActiveTeam, finalScore);
     addToast(`🎉 Equipe <strong>${currentActiveTeam}</strong> acertou! Ganhou <strong>${finalScore}</strong> pontos!`, 'success');
@@ -423,9 +402,8 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
       conexaoStore.playedConexaoIds.push(conexaoStore.currentRoundConexao.id);
       savePlayedConexaoIds(conexaoStore.playedConexaoIds);
     }
-    clearCurrentConexaoRoundStateFromLocalStorage();
 
-  } else {
+  } else { // Equipe errou
     addToast(`❌ Equipe <strong>${currentActiveTeam}</strong> errou! O jogo continua...`, 'error');
 
     conexaoStore.disabledTeams.add(currentActiveTeam);
@@ -435,12 +413,14 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
     const remainingTeams = allTeamColors.filter(team => !conexaoStore.disabledTeams.has(team));
 
     if (remainingTeams.length === 0) {
-        addToast(`Todas as equipes erraram! A resposta correta era: <strong>${currentConexaoPalavra}</strong>.`, 'info');
-        conexaoStore.gameStatus = 'finished';
-        clearCurrentConexaoRoundStateFromLocalStorage();
+        conexaoStore.disabledTeams.clear(); // Reabilita todas as equipes
+        conexaoStore.activeTeam = null;     // Não há equipe ativa
+        conexaoStore.gameStatus = 'revealing'; // Retorna ao estado de revelação
+        startImageAndLetterRevelation(false); // Reinicia/continua a revelação de letras
+        // O watcher irá salvar este estado.
     } else {
+        // Ainda há equipes aptas, continua a rodada com as equipes desabilitadas atuais.
         conexaoStore.gameStatus = 'revealing';
-        // <--- ALTERADO: Ao retomar a revelação após um erro, não revelar uma letra imediatamente.
         startImageAndLetterRevelation(false);
         saveCurrentConexaoRoundStateToLocalStorage();
     }

@@ -1,183 +1,191 @@
 <!-- src/components/AnswerFeedback.vue -->
 <template>
-    <div
-      class="answer-feedback-container"
-      @mousemove="handleMouseMove"
-      @mouseleave="handleMouseLeave"
-    >
-      <button
-        ref="correctButton"
-        @click="handleCorrectClick"
-        class="feedback-button correct-button"
-        :class="{ 'active-glow': activeEffect === 'correct' }"
-      >
-        Correto
-      </button>
-      <button
-        ref="wrongButton"
-        @click="handleWrongClick"
-        class="feedback-button wrong-button"
-        :class="{ 'active-glow': activeEffect === 'wrong' }"
-      >
-        Errado
-      </button>
-    </div>
-  </template>
-  
-  <script lang="ts">
-  import { defineComponent, ref, onMounted, onUnmounted } from 'vue';
-  
-  export default defineComponent({
-    name: 'AnswerFeedback',
-    emits: ['correct-answer', 'wrong-answer'], // Eventos que este componente irá emitir
-    setup(_props, { emit }) {
-      // 'activeEffect' controla qual botão está com o efeito de brilho/suspense
-      const activeEffect = ref<'correct' | 'wrong' | null>(null);
-  
-      // Métodos para emitir os eventos quando os botões são clicados
-      const handleCorrectClick = () => {
-        emit('correct-answer');
-        activeEffect.value = null; // Reseta o efeito após o clique
-      };
-  
-      const handleWrongClick = () => {
-        emit('wrong-answer');
-        activeEffect.value = null; // Reseta o efeito após o clique
-      };
-  
-      // Listener para as teclas 'O' e 'X'
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'o' || event.key === 'O') {
-          event.preventDefault(); // Previne o comportamento padrão do navegador (ex: busca)
-          handleCorrectClick();
-        } else if (event.key === 'x' || event.key === 'X') {
-          event.preventDefault(); // Previne o comportamento padrão do navegador
-          handleWrongClick();
-        }
-      };
-  
-      // Efeito de suspense: determina qual botão está mais próximo do mouse
-      const handleMouseMove = (event: MouseEvent) => {
-        const containerRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        // Calcula a posição X do mouse relativa ao container
-        const mouseX = event.clientX - containerRect.left; 
-        
-        const containerMidpointX = containerRect.width / 2;
-  
-        // Se o mouse estiver na metade esquerda, ativa o efeito no botão 'Correto'
-        if (mouseX < containerMidpointX) {
-          activeEffect.value = 'correct';
-        } else { // Caso contrário, ativa no botão 'Errado'
-          activeEffect.value = 'wrong';
-        }
-      };
-  
-      // Reseta o efeito quando o mouse sai do container
-      const handleMouseLeave = () => {
-        activeEffect.value = null;
-      };
-  
-      // Adiciona e remove os event listeners globais para as teclas
-      onMounted(() => {
-        document.addEventListener('keydown', handleKeyDown);
-        // Adiciona o listener de mouseleave ao container para resetar o efeito
-        const container = document.querySelector('.answer-feedback-container');
-        if (container) {
-          container.addEventListener('mouseleave', handleMouseLeave);
-        }
-      });
-  
-      onUnmounted(() => {
-        document.removeEventListener('keydown', handleKeyDown);
-        const container = document.querySelector('.answer-feedback-container');
-        if (container) {
-          container.removeEventListener('mouseleave', handleMouseLeave);
-        }
-      });
-  
-      return {
-        activeEffect,
-        handleCorrectClick,
-        handleWrongClick,
-        handleMouseMove,
-        handleMouseLeave, // Exponha para o template
-      };
+  <div 
+    class="answer-feedback-container" 
+    @mousemove="handleMouseMove" 
+    @mouseleave="handleMouseLeave"
+  >
+    <!-- Tags de áudio ocultas no DOM -->
+    <audio ref="correctAudioRef" src="/sounds/correct-answer.mp3" preload="auto"></audio>
+    <audio ref="wrongAudioRef" src="/sounds/fail-answer.mp3" preload="auto"></audio>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref, onMounted, onUnmounted } from 'vue';
+
+export default defineComponent({
+  name: 'AnswerFeedback',
+  emits: ['correct-answer', 'wrong-answer'],
+  props: {
+    activeTeam: { 
+      type: String,
+      default: null
     },
-  });
-  </script>
-  
-  <style scoped>
+    disabledTeams: {
+      type: Object,
+      default: () => new Set()
+    }
+  },
+  setup(_props, { emit }) {
+    const activeEffect = ref<'correct' | 'wrong' | null>(null);
+    
+    const correctAudioRef = ref<HTMLAudioElement | null>(null);
+    const wrongAudioRef = ref<HTMLAudioElement | null>(null);
+
+    const playAudio = (audioElement: HTMLAudioElement | null) => {
+      if (audioElement) {
+        // Debug para garantir que o elemento existe e tem uma fonte
+        console.log('Attempting to play audio element:', audioElement);
+        console.log('Audio element src:', audioElement.src);
+        console.log('Audio element networkState:', audioElement.networkState, 'readyState:', audioElement.readyState);
+
+        // Adiciona um pequeno atraso antes de tentar tocar
+        setTimeout(() => {
+          audioElement.currentTime = 0; 
+          audioElement.play().catch(e => {
+            console.error("Erro ao tocar áudio no elemento DOM (após atraso):", e); 
+            if (audioElement) {
+              console.error('Audio element src at error time:', audioElement.src);
+            }
+          }); 
+        }, 50); // Atraso de 50ms
+      }
+    };
+
+    const handleCorrectClick = () => {
+      playAudio(correctAudioRef.value); 
+      emit('correct-answer');
+      activeEffect.value = null; 
+    };
+
+    const handleWrongClick = () => {
+      playAudio(wrongAudioRef.value); 
+      emit('wrong-answer');
+      activeEffect.value = null; 
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'o' || event.key === 'O') {
+        event.preventDefault();
+        handleCorrectClick();
+      } else if (event.key === 'x' || event.key === 'X') {
+        event.preventDefault();
+        handleWrongClick();
+      }
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const container = event.currentTarget as HTMLElement;
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
+      
+      const mouseX = event.clientX - containerRect.left; 
+      const containerMidpointX = containerRect.width / 2;
+
+      if (mouseX < containerMidpointX) {
+        activeEffect.value = 'correct';
+      } else {
+        activeEffect.value = 'wrong';
+      }
+    };
+
+    const handleMouseLeave = () => {
+      activeEffect.value = null;
+    };
+
+    onMounted(() => {
+      document.addEventListener('keydown', handleKeyDown);
+      console.log('Correct Audio Ref (onMounted):', correctAudioRef.value);
+      console.log('Wrong Audio Ref (onMounted):', wrongAudioRef.value);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (correctAudioRef.value) correctAudioRef.value.pause();
+      if (wrongAudioRef.value) wrongAudioRef.value.pause();
+    });
+
+    return {
+      activeEffect,
+      handleCorrectClick,
+      handleWrongClick,
+      handleMouseMove,
+      handleMouseLeave,
+      correctAudioRef,
+      wrongAudioRef,
+    };
+  },
+});
+</script>
+
+<style scoped>
+/* Seus estilos CSS permanecem os mesmos */
+.answer-feedback-container {
+  display: flex;
+  gap: 30px; 
+  justify-content: center;
+  width: 100%;
+  max-width: 600px; 
+  padding: 20px;
+  border-radius: 15px;
+  cursor: crosshair; 
+}
+
+.feedback-button {
+  padding: 20px 40px;
+  font-size: 1.8em;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer; 
+  transition: all 0.3s ease;
+  flex-grow: 1; 
+  max-width: 250px; 
+  position: relative;
+  overflow: hidden;
+}
+
+.correct-button {
+  background-color: #2ecc71; 
+}
+
+.wrong-button {
+  background-color: #e74c3c; 
+}
+
+.feedback-button:hover {
+  transform: translateY(-5px); 
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.active-glow {
+  transform: scale(1.05); 
+  border: 3px solid; 
+}
+
+.correct-button.active-glow {
+    border-color: #76ff03; 
+    box-shadow: 0 0 20px 8px rgba(118, 255, 3, 0.6), inset 0 0 10px 4px rgba(178, 255, 89, 0.4);
+}
+
+.wrong-button.active-glow {
+    border-color: #ff1744; 
+    box-shadow: 0 0 20px 8px rgba(255, 23, 68, 0.6), inset 0 0 10px 4px rgba(255, 82, 82, 0.4);
+}
+
+@media (max-width: 600px) {
   .answer-feedback-container {
-    display: flex;
-    gap: 30px; /* Espaço entre os botões */
-    justify-content: center;
-    width: 100%;
-    max-width: 600px; /* Limita a largura do container */
-    padding: 20px;
-    border-radius: 15px;
-    cursor: crosshair; /* Um cursor mais proeminente para o suspense */
-    /* Se você quiser um cursor personalizado maior, precisará de uma imagem: */
-    /* cursor: url('/path/to/seu-cursor-maior.png') 16 16, auto; */
-    /* O '16 16' são as coordenadas do hotspot do cursor. */
+    flex-direction: column; 
+    gap: 20px;
+    padding: 15px;
   }
-  
   .feedback-button {
-    padding: 20px 40px;
-    font-size: 1.8em;
-    font-weight: bold;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer; /* Mantém o cursor de ponteiro sobre os botões */
-    transition: all 0.3s ease;
-    flex-grow: 1; /* Permite que os botões cresçam e preencham o espaço */
-    max-width: 250px; /* Limita a largura máxima de cada botão */
-    position: relative;
-    overflow: hidden;
+    width: 100%; 
+    max-width: none; 
+    font-size: 1.5em;
+    padding: 15px 30px;
   }
-  
-  .correct-button {
-    background-color: #2ecc71; /* Verde para 'Correto' */
-  }
-  
-  .wrong-button {
-    background-color: #e74c3c; /* Vermelho para 'Errado' */
-  }
-  
-  .feedback-button:hover {
-    transform: translateY(-5px); /* Efeito de elevação ao passar o mouse */
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-  }
-  
-  /* Efeito de brilho/suspense quando o mouse está próximo */
-  .active-glow {
-    transform: scale(1.05); /* Ligeiramente maior */
-    border: 3px solid; /* Adiciona uma borda para o efeito */
-  }
-  
-  .correct-button.active-glow {
-      border-color: #76ff03; /* Borda verde brilhante */
-      box-shadow: 0 0 20px 8px rgba(118, 255, 3, 0.6), inset 0 0 10px 4px rgba(178, 255, 89, 0.4);
-  }
-  
-  .wrong-button.active-glow {
-      border-color: #ff1744; /* Borda vermelha brilhante */
-      box-shadow: 0 0 20px 8px rgba(255, 23, 68, 0.6), inset 0 0 10px 4px rgba(255, 82, 82, 0.4);
-  }
-  
-  
-  /* Responsividade para telas menores */
-  @media (max-width: 600px) {
-    .answer-feedback-container {
-      flex-direction: column; /* Empilha os botões verticalmente em telas pequenas */
-      gap: 20px;
-      padding: 15px;
-    }
-    .feedback-button {
-      width: 100%; /* Largura total */
-      max-width: none; /* Remove a largura máxima */
-      font-size: 1.5em;
-      padding: 15px 30px;
-    }
-  }
-  </style>
+}
+</style>

@@ -1,47 +1,48 @@
 <template>
   <div class="game-active-section">
+    <!-- Componente de Fogos de Artifício, visível apenas quando showFireworks for true -->
+    <FireworksCanvas :color="winningTeamColorHex || '#FFFFFF'" :trigger="showFireworks" />
+
     <!-- Seção da Dica (visível apenas na fase 'hint') -->
     <div v-if="gameStatus === 'hint' && currentRoundCharacter" class="hint-container">
       <span class="hint-label">A Dica é:</span>
       <p class="hint-content">
         {{ displayedHint }}<span v-if="isTyping" class="blinking-cursor">|</span>
       </p>
-      <button @click="stopTypingAndProceed" class="proceed-button">
-        Prosseguir para a Imagem
-      </button>
     </div>
 
     <!-- Exibição da Imagem (visível em todas as fases, exceto 'hint' e 'scoreboard') -->
-    <div v-show="gameStatus !== 'hint' && gameStatus !== 'scoreboard'" class="image-display" ref="imageDisplayRef">
-      <ImageTiler
-        :key="currentRoundCharacter?.id"
-        :image-url="currentRoundCharacter?.imageUrl || ''"
-        :reveal-progress="revealProgress"
-        :grid-size="10"
-        :image-width="calculatedImageWidth"
-        :image-height="calculatedImageHeight"
-      />
+    <div v-show="gameStatus !== 'hint' && gameStatus !== 'scoreboard'"
+         class="image-display"
+         ref="imageDisplayRef">
+      <!-- NOVO: image-frame-container para envolver o ImageTiler e aplicar a borda dinamicamente -->
+      <div class="image-frame-container"
+           :style="{
+             borderColor: imageBorderColor ? imageBorderColor : 'transparent',
+             width: imageFrameComputedWidth,
+             height: imageFrameComputedHeight
+           }">
+        <ImageTiler
+          :key="currentRoundCharacter?.id"
+          :image-url="currentRoundCharacter?.imageUrl || ''"
+          :reveal-progress="revealProgress"
+          :grid-size="10"
+          :image-width="calculatedImageWidth"
+          :image-height="calculatedImageHeight"
+          class="image-tiler-content"
+        />
+      </div>
     </div>
 
-    <!-- Texto de instrução sem quebras de linha indesejadas -->
-    <p class="timer-info" v-if="gameStatus === 'revealing'">
-      Pressione <strong style="color: blue;">1 (Azul)</strong>, <strong style="color: red;">2 (Vermelho)</strong>, <strong style="color: green;">3 (Verde)</strong> ou <strong style="color: yellow;">4 (Amarelo)</strong> para palpitar!
+    <!-- Texto "Pontos em jogo" visível durante as fases 'guessing' ou 'revealing' -->
+    <p class="game-info-text" v-if="gameStatus === 'guessing' || gameStatus === 'revealing'">
+      Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
     </p>
-    <!-- Mensagem "Aguardando resposta da equipe" -->
-    <p class="timer-info guessing-message" v-if="gameStatus === 'guessing' && activeTeam">
-      Aguardando resposta da equipe <strong :style="{ color: teamColorToHex(activeTeam) }">{{ activeTeam }}</strong>! ⏳
-      <!-- Exibe a pontuação potencial da rodada -->
-      <br>Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
+
+    <!-- Exibição da resposta correta quando o jogo está finalizado -->
+    <p class="game-info-text" v-if="gameStatus === 'finished' && currentRoundCharacter">
+      Resposta: <strong>{{ currentRoundCharacter?.name }}</strong>
     </p>
-    <!-- Container para a mensagem finalizada e o botão "Ver Placar" -->
-    <div v-if="gameStatus === 'finished'" class="finished-status-container">
-      <p class="timer-info no-margin-bottom">
-        Rodada finalizada! Resposta Correta: <strong>{{ currentRoundCharacter?.name }}</strong>
-      </p>
-      <button @click="viewImagemOcultaScoreboard" class="view-scoreboard-button"> <!-- ATUALIZADO AQUI -->
-        Ver Placar
-      </button>
-    </div>
 
     <!-- Componente de Feedback do Operador - Visível apenas na fase 'guessing' -->
     <AnswerFeedback
@@ -53,10 +54,8 @@
     <!-- Componente para exibir os toasts -->
     <ToastNotification />
 
-    <!-- Elementos de áudio -->
+    <!-- Elemento de áudio para som de digitação (MANTIDO) -->
     <audio ref="typingAudio" src="/sounds/typing-sound.mp3" preload="auto" loop></audio>
-    <audio ref="correctAnswerAudio" src="/sounds/correct-answer.mp3" preload="auto"></audio>
-    <audio ref="failAnswerAudio" src="/sounds/fail-answer.mp3" preload="auto"></audio>
   </div>
 </template>
 
@@ -65,12 +64,13 @@ import { defineComponent, ref, onMounted, onUnmounted, watch, nextTick, computed
 import ImageTiler from './ImageTiler.vue';
 import ToastNotification from './ToastNotification.vue';
 import AnswerFeedback from './AnswerFeedback.vue';
+import FireworksCanvas from './FireworksCanvas.vue';
 import { Character, GameStatus, TeamColor } from '../types';
-import { 
-  proceedToRevealImagemOculta, // ATUALIZADO: Usando o nome correto
-  viewImagemOcultaScoreboard // ATUALIZADO: Usando o nome correto
-} from '../store/imagemOcultaStore'; // Importando do store
-import { scoreStore } from '../store/scoreStore'; // Importar scoreStore para acessar o score atual
+import {
+  proceedToRevealImagemOculta,
+  viewImagemOcultaScoreboard
+} from '../store/imagemOcultaStore';
+import { scoreStore } from '../store/scoreStore';
 
 export default defineComponent({
   name: 'GameImagemOculta',
@@ -78,6 +78,7 @@ export default defineComponent({
     ImageTiler,
     ToastNotification,
     AnswerFeedback,
+    FireworksCanvas,
   },
   props: {
     currentRoundCharacter: {
@@ -96,39 +97,47 @@ export default defineComponent({
       type: String as PropType<TeamColor | null>,
       default: null,
     },
-    // REMOVIDO: A prop 'score' não é mais necessária aqui, pois será acessada via scoreStore.
-    // score: {
-    //   type: Object as PropType<Record<TeamColor, number>>,
-    //   required: true,
-    // },
   },
-  emits: ['evaluate-guess', 'view-scoreboard'], 
+  emits: ['evaluate-guess', 'view-scoreboard', 'start-new-round-imagem-oculta'],
   setup(_props, { emit }) {
     const imageDisplayRef = ref<HTMLElement | null>(null);
     const typingAudio = ref<HTMLAudioElement | null>(null);
-    const correctAnswerAudio = ref<HTMLAudioElement | null>(null);
-    const failAnswerAudio = ref<HTMLAudioElement | null>(null);
 
-    const calculatedImageWidth = ref(960);
-    const calculatedImageHeight = ref(540);
+    const calculatedImageWidth = ref(0); // Dimensões do CONTEÚDO da imagem (para ImageTiler)
+    const calculatedImageHeight = ref(0); // Dimensões do CONTEÚDO da imagem (para ImageTiler)
+
+    const imageFrameComputedWidth = ref('0px'); // Dimensões do wrapper da borda (CONTEÚDO + BORDA)
+    const imageFrameComputedHeight = ref('0px'); // Dimensões do wrapper da borda (CONTEÚDO + BORDA)
+
     const originalAspectRatio = 16 / 9;
     const fixedGridSize = 10;
+    const BORDER_SIZE_PX = 20;
 
     const displayedHint = ref('');
     const isTyping = ref(false);
     let typingInterval: number | null = null;
 
-    // ----- NOVA PROPRIEDADE COMPUTADA PARA A PONTUAÇÃO DA RODADA -----
+    const winningTeamColorHex = ref<string | null>(null);
+    const showFireworks = ref(false);
+    let fireworksTimeout: ReturnType<typeof setTimeout> | null = null;
+
     const currentPotentialRoundScore = computed(() => {
       const initialScore = 100;
       const tilesRevealed = Math.floor(_props.revealProgress * 100);
       const deductedPoints = tilesRevealed;
       return Math.max(0, initialScore - deductedPoints);
     });
-    // ------------------------------------------------------------------
+
+    const imageBorderColor = computed(() => {
+      if (_props.gameStatus === 'guessing' && _props.activeTeam) {
+        return teamColorToHex(_props.activeTeam);
+      }
+      return '';
+    });
 
     const typeHint = (fullHint: string) => {
       if (typingInterval !== null) clearInterval(typingInterval);
+
       if (typingAudio.value) {
         typingAudio.value.pause();
         typingAudio.value.currentTime = 0;
@@ -141,7 +150,7 @@ export default defineComponent({
       const typingSpeed = 77;
 
       if (typingAudio.value) {
-        typingAudio.value.play().catch(e => console.warn("Autoplay de áudio bloqueado:", e));
+        typingAudio.value.play().catch(e => console.warn("Autoplay de audio de digitação bloqueado:", e));
       }
 
       typingInterval = setInterval(() => {
@@ -169,21 +178,109 @@ export default defineComponent({
 
     const stopTypingAndProceed = () => {
       stopTypingAndAudio();
-      proceedToRevealImagemOculta(); // ATUALIZADO: Usando o nome correto
+      proceedToRevealImagemOculta();
     };
 
     const updateImageDimensions = () => {
       if (imageDisplayRef.value) {
-        let newWidth = imageDisplayRef.value.offsetWidth;
-        if (newWidth > 960) {
-          newWidth = 960;
+        const availableWidthForDisplay = Math.floor(imageDisplayRef.value.offsetWidth);
+        const availableHeightForDisplay = Math.floor(imageDisplayRef.value.offsetHeight);
+
+        // --- Adicionado para depuração ---
+        console.group('Debug Image Dimensions');
+        console.log('gameStatus:', _props.gameStatus);
+        console.log('imageDisplayRef.value:', imageDisplayRef.value);
+        console.log('imageDisplayRef offsetWidth:', availableWidthForDisplay);
+        console.log('imageDisplayRef offsetHeight:', availableHeightForDisplay);
+        // --- Fim da depuração ---
+
+        const contentWidthLimit = availableWidthForDisplay - (2 * BORDER_SIZE_PX);
+        const contentHeightLimit = availableHeightForDisplay - (2 * BORDER_SIZE_PX);
+
+        // --- Adicionado para depuração ---
+        console.log('BORDER_SIZE_PX:', BORDER_SIZE_PX);
+        console.log('contentWidthLimit (available for image content):', contentWidthLimit);
+        console.log('contentHeightLimit (available for image content):', contentHeightLimit);
+        // --- Fim da depuração ---
+
+        let finalImageContentWidth: number;
+        let finalImageContentHeight: number;
+
+        if (contentWidthLimit <= 0 || contentHeightLimit <= 0) {
+          if (calculatedImageWidth.value !== 0) calculatedImageWidth.value = 0;
+          if (calculatedImageHeight.value !== 0) calculatedImageHeight.value = 0;
+          if (imageFrameComputedWidth.value !== '0px') imageFrameComputedWidth.value = '0px';
+          if (imageFrameComputedHeight.value !== '0px') imageFrameComputedHeight.value = '0px';
+          
+          // --- Adicionado para depuração ---
+          console.error('Calculated image dimensions are zero or negative. Image will not be displayed.');
+          console.groupEnd(); // Fecha o grupo de depuração
+          // --- Fim da depuração ---
+          return;
         }
-        newWidth = Math.floor(newWidth / fixedGridSize) * fixedGridSize;
-        if (newWidth < fixedGridSize) {
-            newWidth = fixedGridSize;
+
+        if (contentWidthLimit / contentHeightLimit > originalAspectRatio) {
+          finalImageContentHeight = contentHeightLimit;
+          finalImageContentWidth = contentHeightLimit * originalAspectRatio;
+        } else {
+          finalImageContentWidth = contentWidthLimit;
+          finalImageContentHeight = contentWidthLimit / originalAspectRatio;
         }
-        calculatedImageWidth.value = newWidth;
-        calculatedImageHeight.value = newWidth / originalAspectRatio;
+
+        finalImageContentWidth = Math.floor(finalImageContentWidth / fixedGridSize) * fixedGridSize;
+        finalImageContentHeight = Math.floor(finalImageContentHeight / fixedGridSize) * fixedGridSize;
+
+        if (finalImageContentWidth < fixedGridSize) finalImageContentWidth = fixedGridSize;
+        if (finalImageContentHeight < fixedGridSize) finalImageContentHeight = fixedGridSize;
+
+        // --- Adicionado para depuração ---
+        console.log('finalImageContentWidth (after aspect ratio & gridSize adjust):', finalImageContentWidth);
+        console.log('finalImageContentHeight (after aspect ratio & gridSize adjust):', finalImageContentHeight);
+        console.groupEnd(); // Fecha o grupo de depuração
+        // --- Fim da depuração ---
+
+        if (calculatedImageWidth.value !== finalImageContentWidth) {
+          calculatedImageWidth.value = finalImageContentWidth;
+        }
+        if (calculatedImageHeight.value !== finalImageContentHeight) {
+          calculatedImageHeight.value = finalImageContentHeight;
+        }
+
+        const newFrameWidth = `${finalImageContentWidth + (2 * BORDER_SIZE_PX)}px`;
+        const newFrameHeight = `${finalImageContentHeight + (2 * BORDER_SIZE_PX)}px`;
+
+        if (imageFrameComputedWidth.value !== newFrameWidth) {
+          imageFrameComputedWidth.value = newFrameWidth;
+        }
+        if (imageFrameComputedHeight.value !== newFrameHeight) {
+          imageFrameComputedHeight.value = newFrameHeight;
+        }
+      } else {
+         // --- Adicionado para depuração ---
+         console.group('Debug Image Dimensions');
+         console.warn('imageDisplayRef is null. Cannot update image dimensions.');
+         console.groupEnd();
+         // --- Fim da depuração ---
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (_props.gameStatus === 'finished') {
+        if (event.code === 'Space') {
+          event.preventDefault();
+          emit('start-new-round-imagem-oculta');
+          return;
+        } else if (event.key.toLowerCase() === 'p') {
+          event.preventDefault();
+          viewImagemOcultaScoreboard();
+          return;
+        }
+      }
+
+      if (event.code === 'Space' && _props.gameStatus === 'hint') {
+        event.preventDefault();
+        stopTypingAndProceed();
+        return;
       }
     };
 
@@ -196,21 +293,37 @@ export default defineComponent({
         stopTypingAndAudio();
       }
 
-      // Garante que o redimensionamento ocorra se a imagem for visível
       if (newGameStatus !== 'hint' && newGameStatus !== 'scoreboard' && newImageDisplayRef) {
         nextTick(() => {
           updateImageDimensions();
         });
       }
+      if (newGameStatus !== 'guessing' && newGameStatus !== 'finished') {
+          showFireworks.value = false;
+          winningTeamColorHex.value = null;
+          if (fireworksTimeout) {
+            clearTimeout(fireworksTimeout);
+            fireworksTimeout = null;
+          }
+      }
     }, { immediate: true });
 
     onMounted(() => {
       window.addEventListener('resize', updateImageDimensions);
+      window.addEventListener('keydown', handleKeyDown);
+      nextTick(() => {
+        updateImageDimensions();
+      });
     });
 
     onUnmounted(() => {
       window.removeEventListener('resize', updateImageDimensions);
+      window.removeEventListener('keydown', handleKeyDown);
       stopTypingAndAudio();
+      if (fireworksTimeout) {
+        clearTimeout(fireworksTimeout);
+        fireworksTimeout = null;
+      }
     });
 
     const teamColorToHex = (team: TeamColor | null) => {
@@ -225,21 +338,25 @@ export default defineComponent({
 
     const handleCorrectAnswer = () => {
         console.log('Resposta confirmada como CORRETA!');
-        if (correctAnswerAudio.value) {
-            correctAnswerAudio.value.currentTime = 0;
-            correctAnswerAudio.value.play().catch(e => console.warn("Autoplay de som de acerto bloqueado:", e));
+        if (_props.activeTeam) {
+          winningTeamColorHex.value = teamColorToHex(_props.activeTeam);
+          showFireworks.value = true;
+          if (fireworksTimeout) clearTimeout(fireworksTimeout);
+          fireworksTimeout = setTimeout(() => {
+            showFireworks.value = false;
+            fireworksTimeout = null;
+          }, 2000);
         }
-        // Emite true para acerto e a pontuação calculada
         emit('evaluate-guess', true, currentPotentialRoundScore.value);
     };
 
     const handleWrongAnswer = () => {
         console.log('Resposta confirmada como ERRADA!');
-        if (failAnswerAudio.value) {
-            failAnswerAudio.value.currentTime = 0;
-            failAnswerAudio.value.play().catch(e => console.warn("Autoplay de som de erro bloqueado:", e));
+        showFireworks.value = false;
+        if (fireworksTimeout) {
+          clearTimeout(fireworksTimeout);
+          fireworksTimeout = null;
         }
-        // Emite false para erro e 0 pontos
         emit('evaluate-guess', false, 0);
     };
 
@@ -247,69 +364,89 @@ export default defineComponent({
       stopTypingAndProceed,
       imageDisplayRef,
       typingAudio,
-      correctAnswerAudio,
-      failAnswerAudio,
       displayedHint,
       isTyping,
-      currentPotentialRoundScore, 
+      currentPotentialRoundScore,
       calculatedImageWidth,
       calculatedImageHeight,
+      imageFrameComputedWidth,
+      imageFrameComputedHeight,
       handleCorrectAnswer,
       handleWrongAnswer,
       teamColorToHex,
-      viewImagemOcultaScoreboard, // ATUALIZADO: Retornar para o template
+      imageBorderColor,
+      winningTeamColorHex,
+      showFireworks,
+      viewImagemOcultaScoreboard,
     };
   },
 });
 </script>
 
 <style scoped>
+/* REMOVIDO: Estilos globais para html, body, e box-sizing. Agora estão em App.vue. */
+
 .game-active-section {
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
   width: 100%;
-  max-width: 1060px;
-  padding-top: 20px;
+  height: 100%; /* Ocupa 100% da altura do PARENT (agora, o main-content-area flexível) */
+  overflow: hidden; /* Garante que NADA transborde deste container */
+  box-sizing: border-box;
+  padding: 10px;
+  gap: 20px;
+}
+
+.full-content-area {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 30px;
 }
 
 .hint-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 250px;
+  flex-grow: 1;
   width: 100%;
-  max-width: 700px;
+  max-width: 1200px;
   background-color: #fcfcfc;
-  border-radius: 15px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-  margin-bottom: 35px;
-  padding: 30px;
+  border-radius: 22.5px;
+  box-shadow: 0 9px 22.5px rgba(0, 0, 0, 0.1);
+  padding: 45px;
   text-align: center;
   box-sizing: border-box;
-  border: 1px solid #e0e0e0;
+  border: 1.5px solid #e0e0e0;
   transition: all 0.3s ease;
+  min-height: 375px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .hint-label {
-  font-size: 1.1em;
+  font-size: 2.2em;
   font-weight: 500;
   color: #7f8c8d;
-  margin-bottom: 15px;
+  margin-bottom: 30px;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 2.5px;
 }
 
 .hint-content {
   font-family: 'monospace', 'Courier New', Courier, monospace;
-  font-size: 2.2em;
+  font-size: 5.5em;
   font-weight: 600;
   color: #2c3e50;
-  margin-bottom: 40px;
-  line-height: 1.4;
+  margin-bottom: 60px;
+  line-height: 1.2;
   white-space: pre-wrap;
-  min-height: 3em;
+  word-break: break-word;
+  min-height: 5em;
 }
 
 .blinking-cursor {
@@ -324,79 +461,64 @@ export default defineComponent({
   100% { opacity: 1; }
 }
 
-.proceed-button {
-  background-color: #3498db;
-  color: white;
-  padding: 16px 32px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1.3em;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.proceed-button:hover {
-  background-color: #2980b9;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
-}
-
 .image-display {
-  width: 100%;
-  max-width: 960px;
-  background-color: #ecf0f1;
+  flex-grow: 1;
+  flex-shrink: 1; /* Permite que o item encolha */
+  min-height: 0;  /* Permite que ele encolha abaixo do tamanho de seu conteúdo */
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 25px;
-  min-height: 200px;
+  width: 100%;
+  background-color: transparent;
+  border-radius: 0;
   box-sizing: border-box;
+  box-shadow: none;
+  overflow: hidden; /* Garante que o image-frame-container não transborde */
 }
 
-.timer-info {
-  font-size: 1.3em;
-  margin-bottom: 25px;
-  color: #555;
+.image-frame-container {
+  box-sizing: border-box;
+  border: 20px solid transparent;
+  transition: border-color 0.2s ease-in-out;
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.image-tiler-content {
+  display: block;
+}
+
+.game-info-text {
+  font-size: 2.2em;
+  color: #34495e;
   font-weight: 500;
   text-align: center;
-}
-
-.timer-info.no-margin-bottom {
-  margin-bottom: 0;
-}
-
-.guessing-message {
-  font-size: 1.5em;
-  font-weight: bold;
-  color: #34495e;
+  width: 100%;
+  flex-shrink: 0; /* Impede que esses elementos encolham */
 }
 
 .finished-status-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 25px;
+  gap: 30px;
 }
 
 .view-scoreboard-button {
   background-color: #3498db;
   color: white;
-  padding: 12px 25px;
+  padding: 24px 48px;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1em;
+  border-radius: 12px;
+  font-size: 2em;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 6px 9px rgba(0, 0, 0, 0.1);
 }
 
 .view-scoreboard-button:hover {
   background-color: #2980b9;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
+  box-shadow: 0 9px 15px rgba(0, 0, 0, 0.15);
 }
 </style>

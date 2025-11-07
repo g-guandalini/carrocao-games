@@ -37,7 +37,7 @@ export default defineComponent({
 
     // **Para depuração:** Observe o objeto route para ver o que ele contém
     watchEffect(() => {
-      console.log('DEBUG: Objeto de rota atual:', route);
+      // console.log('DEBUG: Objeto de rota atual:', route); // Desativei para não poluir muito o console
       if (route && !route.path) {
         console.warn('DEBUG: Objeto de rota existe, mas .path está indefinido/falso:', route);
       }
@@ -55,9 +55,20 @@ export default defineComponent({
 </script>
 
 <style>
-/* Estilos globais */
-body {
+/* Estilos globais para reset e controle de overflow */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100vh; /* Ocupa 100% da altura da viewport */
+  width: 100vw;  /* Ocupa 100% da largura da viewport */
   margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* FORÇA a ocultar qualquer rolagem */
+}
+
+body {
   font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -67,15 +78,19 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  /* REMOVA align-items: center; daqui */
+  height: 100%; /* Ocupa 100% da altura do body (que é 100vh) */
+  width: 100%; /* Ocupa 100% da largura do body (que é 100vw) */
+  overflow: hidden; /* Garante que o app em si não tenha rolagem */
 }
 
 /* NOVO ESTILO PARA O WRAPPER */
 .main-content-wrapper {
   flex-grow: 1; /* Permite que este wrapper ocupe o espaço vertical disponível */
   display: flex;
-  justify-content: center; /* Centraliza horizontalmente o conteúdo (por exemplo, o SplashScreen) */
+  /* Não centralize o conteúdo horizontalmente aqui, deixe o router-view (e seus componentes)
+     decidirem sua própria centralização, como ImagemOcultaView com o .main-content-area */
+  /* justify-content: center; */ 
   width: 100%; /* Garante que o wrapper ocupe a largura total do #app */
+  overflow: hidden; /* Importante para cortar conteúdo excedente se router-view transbordar */
 }
 </style>

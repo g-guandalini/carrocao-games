@@ -3,16 +3,18 @@
     <p class="category-selection-title">Selecione as Categorias para jogar <b>{{ gameTypeDisplay }}</b></p>
     <p class="category-selection-subtitle">Escolha pelo menos uma categoria para iniciar o jogo.</p>
 
-    <div v-if="isLoading" class="loading-message">
+    <!-- Exibe a mensagem de carregamento se estiver carregando ou se AINDA não tiver feito a primeira requisição -->
+    <div v-if="isLoading || !hasFetched" class="loading-message">
       Carregando categorias... ⏳
     </div>
 
-    <div v-else-if="categories.length === 0" class="no-categories-message">
+    <!-- Exibe a mensagem de "nenhuma categoria" APENAS SE JÁ CARREGOU, NÃO ESTÁ CARREGANDO E NÃO HÁ CATEGORIAS -->
+    <div v-else-if="hasFetched && !isLoading && categories.length === 0" class="no-categories-message">
       Nenhuma categoria encontrada. Por favor, adicione categorias no painel de administração.
     </div>
 
-    <div v-else class="categories-list-container">
-      <!-- Novo botão para selecionar/remover todas -->
+    <!-- Exibe a lista de categorias APENAS SE JÁ CARREGOU, NÃO ESTÁ CARREGANDO E HÁ CATEGORIAS -->
+    <div v-else-if="hasFetched && !isLoading && categories.length > 0" class="categories-list-container">
       <button
         @click="toggleSelectAll"
         :disabled="categories.length === 0"
@@ -38,14 +40,15 @@
         </label>
       </div>
     </div>
-
-    <div v-if="!isValidSelection" class="error-message">
+    
+    <!-- Condições para botões e mensagem de erro, que podem aparecer depois do carregamento -->
+    <div v-if="!isValidSelection && hasFetched && categories.length > 0" class="error-message">
       Por favor, selecione pelo menos uma categoria para continuar.
     </div>
 
     <button
       @click="startGame"
-      :disabled="!isValidSelection"
+      :disabled="!isValidSelection || isLoading || categories.length === 0"
       class="start-game-button"
     >
       Jogar <b>{{ gameTypeDisplay }} </b>
@@ -58,14 +61,12 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed, watch } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'; // Adicionado onMounted e onBeforeUnmount
 import { useRouter, useRoute } from 'vue-router';
 import { addToast } from '../store/toastStore';
 import { Category } from '../types';
 
-// Importa as funções específicas para Imagem Oculta
 import { imagemOcultaStore, setSelectedImagemOcultaCategories } from '../store/imagemOcultaStore';
-// Importa as funções específicas para Conexão
 import { conexaoStore, setSelectedConexaoCategories } from '../store/conexaoStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -74,11 +75,12 @@ export default defineComponent({
   name: 'CategorySelectionScreen',
   setup() {
     const router = useRouter();
-    const route = useRoute(); // Para ler os query params
-    const categories = ref<Category[]>([]);
+    const route = useRoute();
+    const categories = ref<Category[]>([]); // Inicia como array vazio
     const selectedCategoryIds = ref<number[]>([]);
-    const isLoading = ref(true);
-    const gameType = ref<'imagem-oculta' | 'conexao'>('imagem-oculta'); // Padrão
+    const isLoading = ref(false); // Inicia como false, será true quando fetchCategories for chamada
+    const hasFetched = ref(false); // NOVO: Indica se já foi feita pelo menos uma tentativa de buscar dados
+    const gameType = ref<'imagem-oculta' | 'conexao'>('imagem-oculta');
 
     const gameTypeDisplay = computed(() => {
         return gameType.value === 'imagem-oculta' ? 'Imagem Oculta' : 'Conexão';
@@ -86,14 +88,15 @@ export default defineComponent({
 
     const isValidSelection = computed(() => selectedCategoryIds.value.length > 0);
 
-    // Nova propriedade computada para verificar se todas as categorias estão selecionadas
     const areAllCategoriesSelected = computed(() => {
       if (categories.value.length === 0) return false;
       return selectedCategoryIds.value.length === categories.value.length;
     });
 
     const fetchCategories = async () => {
-      isLoading.value = true;
+      isLoading.value = true; // Inicia o estado de carregamento
+      categories.value = []; // Limpa categorias ao iniciar uma nova busca para evitar dados antigos
+      selectedCategoryIds.value = []; // Limpa seleção ao iniciar nova busca
       try {
         const response = await fetch(`${API_BASE_URL}/api/admin/categories`);
         if (!response.ok) {
@@ -103,29 +106,33 @@ export default defineComponent({
         categories.value = data; 
         
         // Carrega as categorias previamente selecionadas do store correto
-        if (gameType.value === 'imagem-oculta') {
-            selectedCategoryIds.value = [...imagemOcultaStore.selectedCategoryIds];
-        } else if (gameType.value === 'conexao') {
-            selectedCategoryIds.value = [...conexaoStore.selectedCategoryIds];
-        }
+        const storedSelection = gameType.value === 'imagem-oculta' 
+            ? imagemOcultaStore.selectedCategoryIds 
+            : conexaoStore.selectedCategoryIds;
+        
+        // Filtra as IDs armazenadas para garantir que correspondem a categorias existentes
+        selectedCategoryIds.value = storedSelection.filter(id => 
+            categories.value.some(cat => cat.id === id)
+        );
         
         // Se nenhuma categoria estiver selecionada e houver categorias disponíveis, pré-selecione todas
-        // Ou se o jogo for novo e não tiver seleção anterior, selecione todas
         if (selectedCategoryIds.value.length === 0 && categories.value.length > 0) {
             selectedCategoryIds.value = categories.value.map(cat => cat.id);
         }
 
       } catch (error) {
         console.error('Erro ao buscar categorias:', error);
-        addToast('Erro ao carregar categorias do servidor!', 'error');
-        categories.value = [];
+        addToast('Erro ao carregar categorias. Tente novamente mais tarde.', 'error'); // Adiciona toast de erro
+        categories.value = []; // Garante que categories seja um array vazio em caso de erro
       } finally {
-        isLoading.value = false;
+        isLoading.value = false; // Finaliza o estado de carregamento
+        hasFetched.value = true; // Marca que a busca inicial foi concluída
       }
     };
 
-    // Novo método para alternar a seleção de todas as categorias
     const toggleSelectAll = () => {
+      if (categories.value.length === 0) return; // Não faz nada se não há categorias
+
       if (areAllCategoriesSelected.value) {
         selectedCategoryIds.value = []; // Desmarca todas
       } else {
@@ -134,16 +141,18 @@ export default defineComponent({
     };
 
     const startGame = async () => {
-      if (isValidSelection.value) {
-        if (gameType.value === 'imagem-oculta') {
-            setSelectedImagemOcultaCategories(selectedCategoryIds.value);
-            router.push({ name: 'ImagemOcultaGame' });
-        } else if (gameType.value === 'conexao') {
-            setSelectedConexaoCategories(selectedCategoryIds.value);
-            router.push({ name: 'ConexaoGame' }); // Nova rota para o jogo Conexão
+      if (!isLoading.value && categories.value.length > 0) { // Apenas tenta iniciar se não estiver carregando e houver categorias
+        if (isValidSelection.value) {
+          if (gameType.value === 'imagem-oculta') {
+              setSelectedImagemOcultaCategories(selectedCategoryIds.value);
+              router.push({ name: 'ImagemOcultaGame' });
+          } else if (gameType.value === 'conexao') {
+              setSelectedConexaoCategories(selectedCategoryIds.value);
+              router.push({ name: 'ConexaoGame' });
+          }
+        } else {
+          addToast('Por favor, selecione pelo menos uma categoria para continuar.', 'warning');
         }
-      } else {
-        addToast('Selecione pelo menos uma categoria!', 'error');
       }
     };
 
@@ -151,33 +160,56 @@ export default defineComponent({
       router.push({ name: 'Home' });
     };
 
+    // Handler de evento de teclado
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        event.preventDefault(); // Impede rolagem da página
+        // Só tenta iniciar o jogo se o botão não estiver desabilitado pelas condições
+        if (isValidSelection.value && !isLoading.value && categories.value.length > 0) {
+          startGame();
+        }
+      } else if (event.code === 'Escape') {
+        event.preventDefault(); // Impede comportamento padrão do Esc (ex: fechar modal)
+        goBack();
+      }
+    };
+
+    // Adiciona o listener de teclado quando o componente é montado
+    onMounted(() => {
+      window.addEventListener('keydown', handleKeyDown);
+    });
+
+    // Remove o listener de teclado antes do componente ser desmontado
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', handleKeyDown);
+    });
+
     // Observa a mudança no query param 'game'
+    // Chama fetchCategories imediatamente na montagem do componente
     watch(() => route.query.game, (newGameType) => {
         gameType.value = (newGameType === 'conexao') ? 'conexao' : 'imagem-oculta';
-        // Recarrega as categorias e reseta a seleção quando o tipo de jogo muda
+        hasFetched.value = false; // Resetar para que o "Carregando..." apareça em nova troca de jogo
         fetchCategories();
-    }, { immediate: true }); // Executa imediatamente na montagem
-
-    onMounted(() => {
-      // A lógica de `fetchCategories` é agora controlada pelo `watch` com `immediate: true`
-    });
+    }, { immediate: true }); // 'immediate: true' executa o watcher na montagem do componente
 
     return {
       categories,
       selectedCategoryIds,
       isLoading,
+      hasFetched, // Retorna a nova variável
       isValidSelection,
       startGame,
       goBack,
       gameTypeDisplay,
-      areAllCategoriesSelected, // Retorna a nova propriedade computada
-      toggleSelectAll,          // Retorna o novo método
+      areAllCategoriesSelected,
+      toggleSelectAll,
     };
   },
 });
 </script>
 
 <style scoped>
+/* SEU CSS ABAIXO PERMANECE EXATAMENTE O MESMO, SEM ALTERAÇÕES */
 .category-selection-wrapper {
   display: flex;
   flex-direction: column;
@@ -194,7 +226,7 @@ export default defineComponent({
 .category-selection-title {
   color: #2c3e50;
   margin-bottom: 15px;
-  font-size: 1.5em; /* Ajustado para um tamanho mais comum para <p> */
+  font-size: 1.5em;
   text-align: center;
 }
 
@@ -216,14 +248,14 @@ export default defineComponent({
 .categories-list-container {
     display: flex;
     flex-direction: column;
-    align-items: center; /* Centraliza o botão e a lista */
+    align-items: center;
     width: 100%;
-    max-width: 500px; /* Mantém a largura consistente com a lista */
-    margin-bottom: 30px; /* Adiciona margem abaixo do container da lista */
+    max-width: 500px;
+    margin-bottom: 30px;
 }
 
 .toggle-select-all-button {
-  background-color: #3498db; /* Azul para combinar com o tema */
+  background-color: #3498db;
   color: white;
   padding: 10px 20px;
   border: none;
@@ -232,8 +264,8 @@ export default defineComponent({
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
-  margin-bottom: 15px; /* Espaço abaixo do botão */
-  max-width: 400px; /* Alinha com a largura máxima dos itens da lista */
+  margin-bottom: 15px;
+  max-width: 400px;
 }
 
 .toggle-select-all-button:hover:not(:disabled) {
@@ -253,8 +285,7 @@ export default defineComponent({
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  /* max-width: 500px;  Já definido no .categories-list-container */
-  max-height: 300px; /* Reduzi a altura para não empurrar muito os botões de ação */
+  max-height: 300px;
   overflow-y: auto;
   padding-right: 10px;
   padding-bottom: 10px;
@@ -263,7 +294,6 @@ export default defineComponent({
   scrollbar-color: #3498db #f1f1f1;
 }
 
-/* Custom scrollbar para navegadores Webkit (Chrome, Safari) */
 .categories-list::-webkit-scrollbar {
   width: 8px;
 }
@@ -308,7 +338,6 @@ export default defineComponent({
   border-color: #a0d4f1;
 }
 
-/* Estilo para a label inteira quando a categoria está selecionada */
 .category-checkbox-label.is-selected {
   border-color: #3498db;
   background-color: #e0f2f7;
@@ -340,7 +369,6 @@ export default defineComponent({
   background-color: #ffffff;
 }
 
-/* Estilo do checkbox customizado quando checado */
 .category-checkbox:checked + .checkbox-custom {
   background-color: #3498db;
   border-color: #3498db;
@@ -348,7 +376,6 @@ export default defineComponent({
   box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.4);
 }
 
-/* Estilo do "check" dentro do checkbox */
 .category-checkbox:checked + .checkbox-custom::after {
   content: '';
   position: absolute;

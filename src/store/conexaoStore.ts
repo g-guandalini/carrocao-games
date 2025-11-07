@@ -1,7 +1,6 @@
 // src/store/conexaoStore.ts
 import { reactive, watch, computed } from 'vue';
 import { ConexaoGameState, TeamColor, Conexao, GameStatus, Category } from '../types';
-import { addToast } from './toastStore';
 import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -172,7 +171,7 @@ export async function fetchConexoes(categoryIds: number[] = conexaoStore.selecte
 
     } catch (error) {
       console.error('[FetchConexoes] Falha ao buscar conexões:', error);
-      addToast('Erro ao carregar conexões do servidor!', 'error');
+      
       conexaoStore.conexoes = [];
     } finally {
       conexaoStore.isLoadingConexoes = false;
@@ -195,7 +194,7 @@ function pickNextConexaoId(): string | null {
     conexaoStore.playedConexaoIds = [];
     savePlayedConexaoIds([]);
     availableConexoes = conexaoStore.conexoes;
-    addToast('Todas as conexões das categorias selecionadas foram jogadas. Reiniciando a lista para novas rodadas.', 'info');
+    
   }
 
   const orderedAvailable = availableConexoes
@@ -214,7 +213,7 @@ function pickNextConexaoId(): string | null {
     return unorderedAvailable[randomIndex].id;
   }
 
-  addToast('Nenhuma conexão disponível para o jogo nas categorias selecionadas.', 'error');
+  
   return null;
 }
 
@@ -226,7 +225,7 @@ async function startNewCleanConexaoRound() {
   await fetchConexoes();
 
   if (conexaoStore.conexoes.length === 0) {
-    addToast('Não foi possível iniciar a rodada: nenhuma conexão carregada com as categorias selecionadas. Verifique as categorias ou o servidor!', 'error');
+    
     conexaoStore.gameStatus = 'idle';
     return;
   }
@@ -240,12 +239,12 @@ async function startNewCleanConexaoRound() {
       startImageAndLetterRevelation(false);
       saveCurrentConexaoRoundStateToLocalStorage();
     } else {
-      addToast('Erro interno: Conexão escolhida não encontrada na lista (após seleção de ID).', 'error');
+      
       conexaoStore.gameStatus = 'idle';
       clearCurrentConexaoRoundStateFromLocalStorage();
     }
   } else {
-    addToast('Não foi possível selecionar uma conexão para a rodada com as categorias atuais.', 'error');
+    
     conexaoStore.gameStatus = 'idle';
     clearCurrentConexaoRoundStateFromLocalStorage();
   }
@@ -329,19 +328,19 @@ function revealRandomLetter() {
     if (currentRevealed.size >= totalLetters) {
         stopConexaoTimers();
         conexaoStore.gameStatus = 'finished';
-        addToast(`Todas as letras foram reveladas! Resposta: <strong>${palavra}</strong>`, 'info');
+        
     }
   } else {
     stopConexaoTimers();
     conexaoStore.gameStatus = 'finished';
-    addToast(`Todas as letras foram reveladas! Resposta: <strong>${palavra}</strong>`, 'info');
+    
   }
 }
 
 
 export function startImageAndLetterRevelation(shouldRevealFirstLetterImmediately: boolean = true) {
   if (!conexaoStore.currentRoundConexao) {
-    addToast('Erro: Nenhuma conexão selecionada para iniciar a revelação.', 'error');
+    
     return;
   }
   stopConexaoTimers();
@@ -353,7 +352,7 @@ export function startImageAndLetterRevelation(shouldRevealFirstLetterImmediately
   revealImageTimer = setTimeout(() => {
     stopConexaoTimers();
     conexaoStore.gameStatus = 'finished';
-    addToast(`Tempo esgotado para a imagem! Resposta: <strong>${conexaoStore.currentRoundConexao?.palavra}</strong>`, 'info');
+    
   }, REVEAL_IMAGE_DURATION_MS) as unknown as number;
 
   if (shouldRevealFirstLetterImmediately) {
@@ -385,7 +384,6 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
   }
 
   const currentActiveTeam = conexaoStore.activeTeam;
-  // const currentConexaoPalavra = conexaoStore.currentRoundConexao.palavra; // Não será mais usada para finalizar aqui.
 
   stopConexaoTimers();
 
@@ -393,10 +391,10 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
     const finalScore = currentRoundPotentialScore.value;
 
     await updateScore(currentActiveTeam, finalScore);
-    addToast(`🎉 Equipe <strong>${currentActiveTeam}</strong> acertou! Ganhou <strong>${finalScore}</strong> pontos!`, 'success');
+    
 
     conexaoStore.gameStatus = 'finished';
-    conexaoStore.activeTeam = null;
+    // REMOVIDO: conexaoStore.activeTeam = null; // Esta linha foi removida daqui.
 
     if (conexaoStore.currentRoundConexao) {
       conexaoStore.playedConexaoIds.push(conexaoStore.currentRoundConexao.id);
@@ -404,10 +402,10 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
     }
 
   } else { // Equipe errou
-    addToast(`❌ Equipe <strong>${currentActiveTeam}</strong> errou! O jogo continua...`, 'error');
+    
 
     conexaoStore.disabledTeams.add(currentActiveTeam);
-    conexaoStore.activeTeam = null;
+    conexaoStore.activeTeam = null; // Aqui faz sentido limpar, pois esta equipe não é mais ativa para adivinhar.
 
     const allTeamColors = Object.values(TeamColor);
     const remainingTeams = allTeamColors.filter(team => !conexaoStore.disabledTeams.has(team));
@@ -417,18 +415,20 @@ export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwa
         conexaoStore.activeTeam = null;     // Não há equipe ativa
         conexaoStore.gameStatus = 'revealing'; // Retorna ao estado de revelação
         startImageAndLetterRevelation(false); // Reinicia/continua a revelação de letras
-        // O watcher irá salvar este estado.
     } else {
         // Ainda há equipes aptas, continua a rodada com as equipes desabilitadas atuais.
         conexaoStore.gameStatus = 'revealing';
         startImageAndLetterRevelation(false);
-        saveCurrentConexaoRoundStateToLocalStorage();
     }
   }
+  // Salva o estado após TODAS as modificações na função.
+  saveCurrentConexaoRoundStateToLocalStorage();
 }
 
 export function viewConexaoScoreboard() {
   conexaoStore.gameStatus = 'scoreboard';
+  // ADICIONADO: Limpa o time ativo aqui, depois que o GameConexao já teve a chance de usar.
+  conexaoStore.activeTeam = null;
 }
 
 export async function resetConexaoGameScores() {

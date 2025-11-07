@@ -1,6 +1,6 @@
 <template>
   <div class="imagem-oculta-game-wrapper">
-    <GameHeader />
+    <GameHeader class="game-header-fixed-height" /> <!-- Added a class for potential sizing -->
 
     <GameImagemOculta
       v-if="['hint', 'revealing', 'guessing', 'finished'].includes(imagemOcultaStore.gameStatus)"
@@ -10,6 +10,8 @@
       :active-team="imagemOcultaStore.activeTeam"
       @evaluate-guess="handleOperatorFeedback"
       @view-scoreboard="viewScoreboardFromGame"
+      @start-new-round-imagem-oculta="handleStartNewRoundImagemOculta"
+      class="main-content-area"
     />
 
     <ScoreboardScreen
@@ -17,30 +19,31 @@
       :game-status="imagemOcultaStore.gameStatus"
       @next-round="handleNextRoundFromScoreboard"
       @reset-game="handleResetGame"
+      class="main-content-area"
     />
 
-    <p v-else-if="imagemOcultaStore.gameStatus === 'idle' && !imagemOcultaStore.currentRoundCharacter && !imagemOcultaStore.isLoadingCharacters" class="loading-message">
-      Aguardando início do jogo...
-    </p>
-     <p v-else-if="imagemOcultaStore.isLoadingCharacters" class="loading-message">
+    <p v-else-if="imagemOcultaStore.isLoadingCharacters" class="loading-message main-content-area">
       Carregando personagens...
+    </p>
+    <p v-else-if="imagemOcultaStore.gameStatus === 'idle' && !imagemOcultaStore.currentRoundCharacter" class="loading-message main-content-area">
+      Aguardando início do jogo...
     </p>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted, onUnmounted } from 'vue';
-import { 
-  imagemOcultaStore, 
-  initializeImagemOcultaGame, // ATUALIZADO: Nome da função de inicialização
-  startNextImagemOcultaGameRound, // ATUALIZADO: Nome da função para próxima rodada
-  selectImagemOcultaTeam, // ATUALIZADO: Nome da função para seleção de time
-  handleOperatorImagemOcultaFeedback, // ATUALIZADO: Nome da função de feedback do operador
-  resetImagemOcultaGameScores, // ATUALIZADO: Nome da função de reset de scores
-  viewImagemOcultaScoreboard // ATUALIZADO: Nome da função para ver placar
+import {
+  imagemOcultaStore,
+  initializeImagemOcultaGame,
+  startNextImagemOcultaGameRound,
+  selectImagemOcultaTeam,
+  handleOperatorImagemOcultaFeedback,
+  resetImagemOcultaGameScores,
+  viewImagemOcultaScoreboard
 } from '../store/imagemOcultaStore';
-import { TeamColor } from '../types'; 
-import { useRouter } from 'vue-router'; 
+import { TeamColor } from '../types';
+import { useRouter } from 'vue-router';
 
 import GameHeader from '../components/GameHeader.vue';
 import GameImagemOculta from '../components/GameImagemOculta.vue';
@@ -54,60 +57,54 @@ export default defineComponent({
     ScoreboardScreen,
   },
   setup() {
-    const router = useRouter(); 
+    const router = useRouter();
 
-    // Mapeia o feedback do operador para a função do store
     const handleOperatorFeedback = (isCorrect: boolean, scoreAwarded: number) => {
       console.log(`[ImagemOcultaView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
-      // ATUALIZADO: Chama a função com o novo nome
       handleOperatorImagemOcultaFeedback(isCorrect, scoreAwarded);
     };
 
-    // Lógica para seleção de time via teclado
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (imagemOcultaStore.gameStatus === 'revealing') {
         let selectedTeam: TeamColor | null = null;
         switch (event.key) {
-          case '1': selectedTeam = TeamColor.BLUE; break; // Use TeamColor enum values
+          case '1': selectedTeam = TeamColor.BLUE; break;
           case '2': selectedTeam = TeamColor.RED; break;
           case '3': selectedTeam = TeamColor.GREEN; break;
           case '4': selectedTeam = TeamColor.YELLOW; break;
         }
 
         if (selectedTeam) {
-          event.preventDefault(); 
-          // ATUALIZADO: Chama a função com o novo nome
+          event.preventDefault();
           selectImagemOcultaTeam(selectedTeam);
         }
       }
     };
 
-    // Mapeia a ação de ver placar para a função do store
     const viewScoreboardFromGame = () => {
-      // ATUALIZADO: Chama a função com o novo nome
       viewImagemOcultaScoreboard();
     };
-    
-    // NOVO: Função para o botão "Próxima Rodada" do ScoreboardScreen
+
     const handleNextRoundFromScoreboard = () => {
       console.log('[ImagemOcultaView] handleNextRoundFromScoreboard: Chamando startNextImagemOcultaGameRound()...');
-      // ATUALIZADO: Chama a função com o novo nome
-      startNextImagemOcultaGameRound(); 
+      startNextImagemOcultaGameRound();
     };
 
-    // Mapeia a ação de resetar jogo para a função do store
+    const handleStartNewRoundImagemOculta = () => {
+      console.log('[ImagemOcultaView] handleStartNewRoundImagemOculta: Chamando startNextImagemOcultaGameRound()...');
+      startNextImagemOcultaGameRound();
+    };
+
     const handleResetGame = () => {
       console.log('[ImagemOcultaView] handleResetGame: Chamando resetImagemOcultaGameScores()...');
-      // ATUALIZADO: Chama a função com o novo nome
-      resetImagemOcultaGameScores(); 
-      router.push({ name: 'Home' }); // Volta para a tela inicial
+      resetImagemOcultaGameScores();
+      router.push({ name: 'Home' });
     };
 
     onMounted(() => {
       document.addEventListener('keydown', handleGlobalKeyDown);
       console.log('[ImagemOcultaView] onMounted: Chamando initializeImagemOcultaGame()...');
-      // ATUALIZADO: Chama a função com o novo nome
-      initializeImagemOcultaGame(); 
+      initializeImagemOcultaGame();
     });
 
     onUnmounted(() => {
@@ -116,9 +113,10 @@ export default defineComponent({
 
     return {
       imagemOcultaStore,
-      handleNextRoundFromScoreboard, 
+      handleNextRoundFromScoreboard,
       handleOperatorFeedback,
       viewScoreboardFromGame,
+      handleStartNewRoundImagemOculta,
       handleResetGame,
     };
   },
@@ -126,6 +124,8 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* REMOVIDO: Estilos globais para html, body, e box-sizing. Agora estão em App.vue. */
+
 .imagem-oculta-game-wrapper {
   display: flex;
   flex-direction: column;
@@ -133,14 +133,32 @@ export default defineComponent({
   padding: 0;
   font-family: 'Poppins', sans-serif;
   background-color: #f0f2f5;
-  min-height: 100vh;
+  height: 100%; /* Important: Refers to parent's height (which is 100vh from global CSS) */
+  overflow: hidden; /* Hide any overflow within this wrapper */
   color: #333;
   width: 100%;
 }
 
+.game-header-fixed-height { /* Added class to GameHeader */
+  flex-shrink: 0; /* Ensures GameHeader doesn't shrink */
+  /* You might want to define a fixed height here, e.g., height: 80px; */
+  /* Or ensure GameHeader manages its own height and doesn't have external margins */
+}
+
+.main-content-area {
+  flex-grow: 1; /* Occupy all remaining vertical space */
+  overflow: hidden; /* Hide any overflow within this content area */
+  width: 100%; /* Ensure it takes full width */
+  display: flex; /* Maintain flex structure */
+  flex-direction: column;
+  justify-content: center; /* Center content vertically */
+  align-items: center; /* Center content horizontally */
+}
+
 .loading-message {
-  margin-top: 50px;
+  /* Removido margin-top, para que o flexbox gerencie o espaçamento */
   font-size: 1.2em;
   color: #555;
+  /* Considerar adicionar um padding ou gap no pai se precisar de espaçamento */
 }
 </style>

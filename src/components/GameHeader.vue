@@ -26,6 +26,7 @@ export default defineComponent({
   position: sticky;
   top: 0;
   z-index: 1000;
+  justify-content:center
 }
 
 .game-header-brand {

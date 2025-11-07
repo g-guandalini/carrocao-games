@@ -1,68 +1,67 @@
-// GameConexao.vue
 <template>
   <div class="game-conexao-container">
+    <!-- Componente de Fogos de Artifício, visível apenas quando showFireworks for true -->
+    <FireworksCanvas :color="winningTeamColorHex || '#FFFFFF'" :trigger="showFireworks" />
+
     <!-- Imagem da Conexão -->
     <div class="image-display-area">
-        <img
-            v-if="currentRoundConexao?.imageUrl"
-            :src="baseURL + currentRoundConexao.imageUrl"
-            alt="Conexão"
-            class="game-image"
-        />
-        <div v-if="gameStatus === 'finished'" class="game-finished-overlay">
-            <p>A palavra era:</p>
-            <h2>{{ currentRoundConexao?.palavra }}</h2>
-        </div>
+      <img
+          v-if="currentRoundConexao?.imageUrl"
+          :src="baseURL + currentRoundConexao.imageUrl"
+          alt="Conexao"
+          class="game-image"
+          :style="{ border: imageBorderColor ? '10px solid ' + imageBorderColor : 'none' }"
+      />
     </div>
 
-    <!-- Palavra sendo revelada -->
-    <div class="word-display">
+    <!-- ÁREA PARA PONTOS, PALAVRA E CONTROLES -->
+    <div class="bottom-content-area">
+      <!-- Informação de quantos pontos está valendo a rodada -->
+      <!-- AJUSTE: Ocultar quando o gameStatus for 'finished' -->
+      <div v-if="gameStatus !== 'finished'" class="round-score-display">
+        <p>Pontos da Rodada: <span class="score-value">{{ currentPotentialScore }}</span></p>
+      </div>
+
+      <!-- Palavra sendo revelada -->
+      <div class="word-display">
         <span v-for="(char, index) in formattedPalavra" :key="index" class="letter"
-              :class="{ 'revealed': char !== '_' && char !== ' ' }">
+              :class="{ 'revealed': char !== '_' && char !== ' ' }"
+              :style="gameStatus === 'finished' && winningTeamColorHex ? { color: winningTeamColorHex } : {}">
             {{ char }}
         </span>
-    </div>
+      </div>
 
-    <!-- Controles do Jogo -->
-    <div class="game-controls">
-        <div v-if="gameStatus === 'revealing'" class="revealing-state">
-            <p class="timer-info">
-              Pressione <strong style="color: blue;">1 (Azul)</strong>, <strong style="color: red;">2 (Vermelho)</strong>, <strong style="color: green;">3 (Verde)</strong> ou <strong style="color: yellow;">4 (Amarelo)</strong> para palpitar!
-            </p>
-        </div>
-
+      <!-- Controles do Jogo (visualmene ocultos, mas presentes no DOM) -->
+      <div class="game-controls">
         <div v-if="gameStatus === 'guessing' && activeTeam" class="guessing-state">
-            <p class="guessing-message">
-                Aguardando resposta da equipe <strong :style="{ color: teamColorToHex(activeTeam) }">{{ activeTeam }}</strong>! ⏳
-            <br>
-                Pontos em jogo: <strong>{{ currentPotentialScore }}</strong>
-            </p>
-
-            <AnswerFeedback
-                @correct-answer="evaluateGuess(true, 0)"
-                @wrong-answer="evaluateGuess(false, 0)"
-            />
+          <!-- Passando activeTeam e disabledTeams para AnswerFeedback -->
+          <AnswerFeedback
+              :activeTeam="activeTeam"
+              :disabledTeams="disabledTeams"
+              @correct-answer="evaluateGuess(true, 0)"
+              @wrong-answer="evaluateGuess(false, 0)"
+          />
         </div>
-
         <div v-if="gameStatus === 'finished'" class="finished-state">
-            <button @click="viewConexaoScoreboard" class="btn-action info">Ver Placar</button>
+          <!-- O botão "Ver Placar" ainda existe como alternativa ao 'P' -->
+          <button @click="viewConexaoScoreboard" class="btn-action info">Ver Placar</button>
         </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed } from 'vue';
+import { defineComponent, PropType, computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Conexao, GameStatus, TeamColor } from '../types';
-import {
-    viewConexaoScoreboard,
-} from '../store/conexaoStore';
 import AnswerFeedback from './AnswerFeedback.vue';
+import FireworksCanvas from './FireworksCanvas.vue';
 
 export default defineComponent({
   name: 'GameConexao',
   components: {
     AnswerFeedback,
+    FireworksCanvas,
   },
   props: {
     currentRoundConexao: {
@@ -78,7 +77,7 @@ export default defineComponent({
       required: true,
     },
     activeTeam: {
-      type: String as PropType<TeamColor | null>,
+      type: [String, null] as PropType<TeamColor | null>,
       required: true,
     },
     disabledTeams: {
@@ -90,19 +89,74 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['evaluate-guess', 'view-scoreboard'],
+  // ADIÇÃO: 'start-new-round' foi adicionado aos eventos emitidos
+  emits: ['evaluate-guess', 'view-scoreboard', 'start-new-round'],
   setup(props, { emit }) {
+
     const baseURL = import.meta.env.VITE_API_BASE_URL;
 
-    const activeTeamClass = computed(() => {
-      return props.activeTeam?.toLowerCase();
-    });
+    const imageBorderColor = ref('');
+    const showGameFinishedOverlay = ref(false);
+    const isColorSelectionLocked = ref(false);
+    const winningTeamColorHex = ref<string | null>(null);
+    const showFireworks = ref(false);
+    let fireworksTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const teamNameToHex: Record<string, string> = {
+      'Azul': '#3498db',
+      'Vermelho': '#e74c3c',
+      'Verde': '#2ecc71',
+      'Amarelo': '#f1c40f',
+    };
+
+    watch(() => props.gameStatus, (newStatus, oldStatus) => {
+      console.log(`[GameConexao Watcher DEBUG] Novo Status: ${newStatus}, Status Anterior: ${oldStatus}`);
+      console.log(`[GameConexao Watcher DEBUG] Valor de props.activeTeam NO INÍCIO do watcher: ${props.activeTeam}`);
+
+      if (newStatus === 'finished') {
+        showGameFinishedOverlay.value = true;
+        if (oldStatus !== 'finished' && props.activeTeam) {
+          console.log(`[GameConexao Watcher DEBUG] Condição interna de fogos ATENDIDA.`);
+          winningTeamColorHex.value = teamNameToHex[props.activeTeam];
+          console.log(`[GameConexao Watcher DEBUG] teamNameToHex[props.activeTeam] resultou em: ${winningTeamColorHex.value}`);
+
+          showFireworks.value = true;
+          console.log('Fireworks activated.');
+          console.log(`[GameConexao Watcher DEBUG] Cor FINAL sendo enviada para FireworksCanvas: ${winningTeamColorHex.value}`);
+
+          if (fireworksTimeout) clearTimeout(fireworksTimeout);
+          fireworksTimeout = setTimeout(() => {
+            showFireworks.value = false;
+            console.log('Fireworks deactivated after 2 seconds.');
+            fireworksTimeout = null;
+          }, 2000);
+        } else {
+          console.log(`[GameConexao Watcher DEBUG] Condição interna de fogos NÃO atendida.`);
+          console.log(`[GameConexao Watcher DEBUG] oldStatus !== 'finished': ${oldStatus !== 'finished'}`);
+          console.log(`[GameConexao Watcher DEBUG] props.activeTeam é válido: ${!!props.activeTeam}, valor: ${props.activeTeam}`);
+        }
+      } else {
+        showGameFinishedOverlay.value = false;
+        imageBorderColor.value = '';
+        isColorSelectionLocked.value = false;
+        winningTeamColorHex.value = null;
+        showFireworks.value = false;
+        console.log('Game status changed, resetting visual states.');
+
+        if (fireworksTimeout) {
+          clearTimeout(fireworksTimeout);
+          fireworksTimeout = null;
+        }
+      }
+    }, { immediate: true });
 
     const evaluateGuess = (isCorrect: boolean, scoreAwarded: number) => {
+      isColorSelectionLocked.value = false;
       emit('evaluate-guess', isCorrect, scoreAwarded);
     };
 
     const viewConexaoScoreboard = () => {
+      showGameFinishedOverlay.value = false;
       emit('view-scoreboard');
     };
 
@@ -110,7 +164,6 @@ export default defineComponent({
         if (!props.currentRoundConexao || !props.currentRoundConexao.palavra) return '';
         const palavra = props.currentRoundConexao.palavra.toUpperCase();
 
-        // NOVO: Se o jogo terminou, mostra a palavra completa
         if (props.gameStatus === 'finished') {
             return palavra;
         }
@@ -123,202 +176,230 @@ export default defineComponent({
         }).join('');
     });
 
-    const teamColorToHex = (team: TeamColor | null) => {
-      switch (team) {
-        case TeamColor.BLUE: return '#3498db';
-        case TeamColor.RED: return '#e74c3c';
-        case TeamColor.GREEN: return '#2ecc71';
-        case TeamColor.YELLOW: return '#f1c40f';
-        default: return '#555';
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // MODIFICAÇÃO AQUI: Lógica para 'Espaço' e 'P' quando o jogo está 'finished'
+      if (props.gameStatus === 'finished' && showGameFinishedOverlay.value) {
+        if (event.code === 'Space') { // Iniciar nova rodada
+          event.preventDefault();
+          emit('start-new-round'); // Emite o novo evento para iniciar uma rodada
+          return;
+        } else if (event.key === 'p' || event.key === 'P') { // Ir para o placar
+          event.preventDefault();
+          viewConexaoScoreboard(); // Chama a função existente para ir ao placar
+          return;
+        }
+      }
+
+      if (!isColorSelectionLocked.value && props.gameStatus !== 'finished' && props.gameStatus === 'guessing') {
+        let teamNameKey: string | null = null;
+
+        switch (event.key) {
+          case '1':
+            teamNameKey = 'Azul';
+            break;
+          case '2':
+            teamNameKey = 'Vermelho';
+            break;
+          case '3':
+            teamNameKey = 'Verde';
+            break;
+          case '4':
+            teamNameKey = 'Amarelo';
+            break;
+        }
+
+        if (teamNameKey) {
+          const colorToApply = teamNameToHex[teamNameKey];
+          console.log(`Key pressed: ${event.key}, Team Name Key: ${teamNameKey}, Applying Color (HEX): ${colorToApply}`);
+          imageBorderColor.value = colorToApply;
+          isColorSelectionLocked.value = true;
+        }
       }
     };
 
+    onMounted(() => {
+      window.addEventListener('keydown', handleKeyPress);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener('keydown', handleKeyPress);
+      if (fireworksTimeout) {
+        clearTimeout(fireworksTimeout);
+      }
+    });
+
     return {
       baseURL,
-      activeTeamClass,
       formattedPalavra,
       TeamColor,
       evaluateGuess,
       viewConexaoScoreboard,
-      teamColorToHex
+      imageBorderColor,
+      showGameFinishedOverlay,
+      winningTeamColorHex,
+      showFireworks,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Seu CSS existente (sem alterações significativas aqui) */
 .game-conexao-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 25px;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-  padding: 30px;
-  margin-top: 30px;
-  width: 90%;
-  max-width: 960px;
+  position: fixed;
+  top: var(--header-height, 75px);
+  left: 0;
+  width: 100vw;
+  height: calc(100vh - var(--header-height, 80px));
+  display: grid;
+  grid-template-columns: 100vw;
+  grid-template-rows: 1fr auto;
+  box-sizing: border-box;
+  background-color: #f0f2f5;
   font-family: 'Poppins', sans-serif;
+  overflow: hidden;
+  z-index: 100;
+  padding: 0;
 }
 
 .image-display-area {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* 16:9 Aspect Ratio (height / width * 100%) */
-  background-color: #e0e0e0;
-  border-radius: 8px;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: transparent;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 .game-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+  position: relative;
+  width: auto;
   height: 100%;
+  max-width: 100%;
   object-fit: contain;
   display: block;
   z-index: 1;
+  transition: border 0.2s ease-in-out;
+  box-sizing: border-box;
 }
 
-.game-finished-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
+.bottom-content-area {
   width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  color: white;
-  text-align: center;
-  font-size: 2em;
-  font-weight: bold;
-  z-index: 3;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  padding: 1vh 1vw;
 }
-.game-finished-overlay p {
-    font-size: 0.6em;
-    margin-bottom: 10px;
-    opacity: 0.8;
+
+.round-score-display {
+  margin-bottom: 1.5vh;
+  font-size: clamp(0.9em, 2vw, 1.5em);
+  font-weight: bold;
+  color: #34495e;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 1vw;
+  white-space: nowrap;
+}
+
+.round-score-display .score-value {
+  color: #363435;
+  font-size: 1.1em;
 }
 
 .word-display {
-    font-family: 'Monospace', monospace;
-    font-size: 3em;
-    font-weight: bold;
-    letter-spacing: 5px;
-    color: #34495e;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 5px;
-    margin-top: 20px;
+  font-family: 'Monospace', monospace;
+  font-size: clamp(6em, 6vw, 6em);
+  font-weight: bold;
+  letter-spacing: 0.4vw;
+  color: #34495e; /* Cor padrão, será sobrescrita se winningTeamColorHex estiver definido */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4vw;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 1;
+  min-width: 0.5em;
+  overflow-wrap: break-word;
+  height: auto;
+  text-align: center;
 }
-
 .letter {
-    display: inline-block;
-    width: 0.8em;
-    text-align: center;
-    border-bottom: 3px solid #ccc;
-    line-height: 1.2;
-    transition: color 0.3s ease, border-color 0.3s ease;
+  display: inline-block;
+  padding: 0 0.05em;
+  text-align: center;
+  line-height: 1;
+  transition: color 0.3s ease, border-color 0.3s ease;
+  flex-shrink: 1;
+  min-width: 0.5em;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
 }
-
 .letter.revealed {
-    border-color: transparent;
-    color: #2ecc71;
+  border-color: transparent;
+  color: #363435; /* Cor padrão para letras reveladas, será sobrescrita se winningTeamColorHex estiver definido */
 }
 
 .game-controls {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   text-align: center;
+  flex-shrink: 0;
+  flex-grow: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  gap: 1vh;
 }
 
-.revealing-state, .guessing-state, .finished-state {
+.guessing-state, .finished-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
+  gap: 1vh;
   width: 100%;
+  overflow: hidden;
 }
-
-.timer-info {
-  font-size: 1.2em;
-  color: #555;
-  margin-bottom: 15px;
-  line-height: 1.5;
-  text-align: center;
-  max-width: 500px;
-}
-.timer-info strong {
-  font-weight: bold;
-}
-
-.btn-action {
-  padding: 12px 25px;
-  border: none;
-  border-radius: 6px;
-  font-size: 1.1em;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  min-width: 200px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-}
-
-.btn-action.info {
-  background-color: #007bff;
-  color: white;
-}
-.btn-action.info:hover {
-  background-color: #0056b3;
-  transform: translateY(-2px);
-}
-
-.guessing-text-status {
-  font-size: 1.4em;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-.guessing-text-score {
-  font-size: 1.2em;
-  color: #555;
-  margin-bottom: 15px;
-}
-.guessing-text-score strong {
-  font-weight: bold;
-  color: #388E3C;
-}
-
-.guessing-text-status .blue { color: #007bff; }
-.guessing-text-status .red { color: #dc3545; }
-.guessing-text-status .green { color: #28a745; }
-.guessing-text-status .yellow { color: #ffc107; }
-
-@media (max-width: 768px) {
-  .game-conexao-container {
-    padding: 20px;
-  }
-  .image-display-area {
-    width: 95%;
-  }
-  .btn-action {
-    width: 100%;
-    max-width: 250px;
-  }
-  .word-display {
-      font-size: 2em;
-      letter-spacing: 3px;
-      gap: 3px;
-  }
-}
-
 .guessing-message {
-  font-size: 1.5em;
-  font-weight: bold;
-  color: #34495e;
+    font-size: clamp(0.8em, 1.8vh, 1.4em);
+    font-weight: bold;
+    color: #34495e;
+    margin-bottom: 0.5vh;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
 }
+.guessing-message strong {
+    font-size: 1.1em;
+}
+.btn-action {
+    padding: 1vh 2vw;
+    font-size: clamp(0.7em, 1.5vh, 1.1em);
+    width: auto;
+    max-width: 95vw;
+    margin: 0.5vh auto;
+    box-sizing: border-box;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    display: block;
+}
+.guessing-message strong.blue { color: #007bff; }
+.guessing-message strong.red { color: #dc3545; }
+.guessing-message strong.green { color: #28a745; }
+.guessing-message strong.yellow { color: #f1c40f; }
 </style>

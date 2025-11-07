@@ -12,6 +12,7 @@
       :current-potential-score="currentRoundPotentialScore"
       @evaluate-guess="handleOperatorFeedback"
       @view-scoreboard="viewScoreboardFromGame"
+      @start-new-round="handleStartNewRound"
     />
 
     <ScoreboardScreen
@@ -40,7 +41,7 @@ import {
   handleOperatorConexaoFeedback,
   resetConexaoGameScores,
   viewConexaoScoreboard,
-  currentRoundPotentialScore // <--- NOVO: Importando a propriedade computada
+  currentRoundPotentialScore
 } from '../store/conexaoStore';
 import { TeamColor } from '../types';
 import { useRouter } from 'vue-router';
@@ -61,7 +62,6 @@ export default defineComponent({
 
     const handleOperatorFeedback = (isCorrect: boolean, scoreAwarded: number) => {
       console.log(`[ConexaoView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
-      // scoreAwarded não é mais usado aqui, pois o cálculo é feito no store
       handleOperatorConexaoFeedback(isCorrect, scoreAwarded);
     };
 
@@ -91,6 +91,12 @@ export default defineComponent({
       startNextConexaoGameRound();
     };
 
+    // NOVO: Função para lidar com o evento 'start-new-round'
+    const handleStartNewRound = () => {
+      console.log('[ConexaoView] handleStartNewRound: Chamando startNextConexaoGameRound()...');
+      startNextConexaoGameRound();
+    };
+
     const handleResetGame = () => {
       console.log('[ConexaoView] handleResetGame: Chamando resetConexaoGameScores()...');
       resetConexaoGameScores();
@@ -112,8 +118,9 @@ export default defineComponent({
       handleNextRoundFromScoreboard,
       handleOperatorFeedback,
       viewScoreboardFromGame,
+      handleStartNewRound, // ADIÇÃO: Expondo a nova função
       handleResetGame,
-      currentRoundPotentialScore, // <--- NOVO: Expondo a propriedade computada
+      currentRoundPotentialScore,
     };
   },
 });

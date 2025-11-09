@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "install-backend": "npm install --prefix ./server",
     "start-backend": "node server/index.js",
-    "render-build": "npm run install-backend && npm run build",
+    "render-build": "npm install && npm run install-backend && npm run build",
     "render-start": "npm run start-backend"
   },
   "dependencies": {

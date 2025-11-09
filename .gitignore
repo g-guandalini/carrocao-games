@@ -21,3 +21,5 @@
 
 /server/node_modules
 /server/db
+/public/characters/*
+/public/conexao_images/*

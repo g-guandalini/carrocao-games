@@ -1,20 +1,5 @@
 <template>
-  <div class="game-actions">
-    <button
-      v-if="gameStatus === 'finished' || gameStatus === 'scoreboard'"
-      @click="$emit('next-round')"
-      class="action-button primary"
-    >
-      Próxima Rodada ➡️
-    </button>
-    <button
-      v-if="gameStatus === 'finished' || gameStatus === 'scoreboard'"
-      @click="$emit('reset-game')"
-      class="action-button secondary"
-    >
-      Reiniciar Jogo (Zerar Placar) ↩️
-    </button>
-  </div>
+  
 </template>
 
 <script lang="ts">
@@ -30,6 +15,28 @@ export default defineComponent({
     },
   },
   emits: ['next-round', 'reset-game'],
+  mounted() {
+    // Adiciona o listener de evento de teclado ao objeto window quando o componente é montado
+    window.addEventListener('keydown', this.handleKeyDown);
+  },
+  beforeUnmount() {
+    // Remove o listener de evento de teclado do objeto window antes do componente ser destruído
+    window.removeEventListener('keydown', this.handleKeyDown);
+  },
+  methods: {
+    handleKeyDown(event: KeyboardEvent) {
+      // Verifica se o jogo está no estado onde os botões seriam visíveis/ativos
+      if (this.gameStatus === 'finished' || this.gameStatus === 'scoreboard') {
+        if (event.code === 'Space') {
+          event.preventDefault(); // Previne o comportamento padrão da tecla Espaço (como rolar a página)
+          this.$emit('next-round');
+        } else if (event.code === 'Escape') {
+          event.preventDefault(); // Previne o comportamento padrão da tecla Esc
+          this.$emit('reset-game');
+        }
+      }
+    },
+  },
 });
 </script>
 

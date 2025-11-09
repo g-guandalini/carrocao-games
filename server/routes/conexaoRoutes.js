@@ -1,29 +1,29 @@
-// server/routes/imagemOcultaRoutes.js
+// server/routes/conexaoRoutes.js
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { runAsync, getAsync, allAsync } = require('../database');
 const createUploader = require('../utils/upload'); 
-const upload = createUploader('characters'); 
+const upload = createUploader('conexao_images'); 
 const multer = require('multer'); 
 
 // Função auxiliar para obter o caminho completo do arquivo de imagem
 const getFullPath = (imagePath) => {
-    if (!imagePath || !imagePath.startsWith('/characters/')) {
+    if (!imagePath || !imagePath.startsWith('/conexao_images/')) {
         return null;
     }
     return path.join(__dirname, '..', '..', 'public', imagePath);
 };
 
-// Função auxiliar para formatar itens de Imagem Oculta com suas categorias
-async function formatImagemOcultaWithCategories(imagemOcultaItems) {
+// Função auxiliar para formatar itens de Conexão com suas categorias
+async function formatConexaoWithCategories(conexaoItems) {
     const formattedItems = [];
-    for (const item of imagemOcultaItems) {
+    for (const item of conexaoItems) {
         const categories = await allAsync(
             `SELECT c.id, c.name FROM categories c
-             INNER JOIN category_imagem_oculta cio ON c.id = cio.category_id -- CORRIGIDO: Usando category_imagem_oculta
-             WHERE cio.imagem_oculta_id = ?`, // CORRIGIDO: Usando category_imagem_oculta_id
+             INNER JOIN category_conexao cc ON c.id = cc.category_id -- CORRIGIDO: Usando category_conexao
+             WHERE cc.conexao_id = ?`, // CORRIGIDO: Usando conexao_id
             [item.id]
         );
         formattedItems.push({ ...item, categories });
@@ -34,79 +34,76 @@ async function formatImagemOcultaWithCategories(imagemOcultaItems) {
 // =========================================================
 //                   ROTAS PARA O JOGO (frontend)
 // =========================================================
-router.get('/imagem-oculta', async (req, res) => {
+router.get('/conexao', async (req, res) => {
     try {
-        let sql = "SELECT io.* FROM imagem_oculta io";
+        let sql = "SELECT co.* FROM conexao co";
         const params = [];
         const categoryIdsQuery = req.query.categoryIds;
 
         if (categoryIdsQuery) {
             const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
             if (ids.length > 0) {
-                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")"; // CORRIGIDO: Usando category_imagem_oculta
+                sql += " INNER JOIN category_conexao cc ON co.id = cc.conexao_id WHERE cc.category_id IN (" + ids.map(() => '?').join(',') + ")"; // CORRIGIDO: Usando category_conexao
                 params.push(...ids);
-                sql += " GROUP BY io.id"; 
+                sql += " GROUP BY co.id";
             }
         }
         
-        sql += " ORDER BY io.order_idx IS NULL, io.order_idx ASC, io.id ASC";
+        sql += " ORDER BY co.order_idx IS NULL, co.order_idx ASC, co.id ASC";
 
-        const imagemOculta = await allAsync(sql, params);
-        // Para o jogo, podemos retornar os itens sem as categorias aninhadas para otimização
-        // Se o frontend do jogo precisar das categorias, a função formatImagemOcultaWithCategories pode ser usada.
-        res.json(imagemOculta);
+        const conexao = await allAsync(sql, params);
+        res.json(conexao);
     } catch (err) {
-        console.error('Erro ao buscar imagens ocultas para o jogo:', err);
+        console.error('Erro ao buscar conexões para o jogo:', err);
         res.status(500).json({ error: err.message });
     }
 });
-
 
 // =========================================================
 //                   ROTAS PARA ADMIN (painel)
 // =========================================================
-router.get('/admin/imagem-oculta', async (req, res) => {
+router.get('/admin/conexao', async (req, res) => {
     try {
-        let sql = "SELECT io.* FROM imagem_oculta io";
+        let sql = "SELECT co.* FROM conexao co";
         const params = [];
         const categoryIdsQuery = req.query.categoryIds;
 
         if (categoryIdsQuery) {
             const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
             if (ids.length > 0) {
-                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")"; // CORRIGIDO: Usando category_imagem_oculta
+                sql += " INNER JOIN category_conexao cc ON co.id = cc.conexao_id WHERE cc.category_id IN (" + ids.map(() => '?').join(',') + ")"; // CORRIGIDO: Usando category_conexao
                 params.push(...ids);
-                sql += " GROUP BY io.id"; 
+                sql += " GROUP BY co.id";
             }
         }
         
-        sql += " ORDER BY io.order_idx IS NULL, io.order_idx ASC, io.id ASC";
+        sql += " ORDER BY co.order_idx IS NULL, co.order_idx ASC, co.id ASC";
 
-        const imagemOculta = await allAsync(sql, params);
-        const formattedItems = await formatImagemOcultaWithCategories(imagemOculta);
+        const conexao = await allAsync(sql, params);
+        const formattedItems = await formatConexaoWithCategories(conexao);
         res.json(formattedItems);
     } catch (err) {
-        console.error('Erro ao buscar imagens ocultas para admin:', err);
+        console.error('Erro ao buscar conexões para admin:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-router.get('/admin/imagem-oculta/:id', async (req, res) => {
+router.get('/admin/conexao/:id', async (req, res) => {
     try {
-        const item = await getAsync("SELECT * FROM imagem_oculta WHERE id = ?", [req.params.id]);
+        const item = await getAsync("SELECT * FROM conexao WHERE id = ?", [req.params.id]);
         if (item) {
-            const formattedItems = await formatImagemOcultaWithCategories([item]);
+            const formattedItems = await formatConexaoWithCategories([item]);
             res.json(formattedItems[0]);
         } else {
-            res.status(404).json({ message: 'Imagem Oculta não encontrada.' });
+            res.status(404).json({ message: 'Conexão não encontrada.' });
         }
     } catch (err) {
-        console.error('Erro ao buscar imagem oculta por ID para admin:', err);
+        console.error('Erro ao buscar conexão por ID para admin:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-router.post('/admin/imagem-oculta', (req, res, next) => {
+router.post('/admin/conexao', (req, res, next) => {
     upload.single('image')(req, res, async (err) => { 
         if (err) {
             console.error('Multer error during POST:', err);
@@ -117,43 +114,41 @@ router.post('/admin/imagem-oculta', (req, res, next) => {
             }
         }
 
-        const { hint, answer, categoryIds, order } = req.body || {}; 
-        
-        const processedHint = (hint || '').trim();
-        const processedAnswer = (answer || '').trim();
-        const processedOrder = order ? parseInt(order, 10) : null;
+        const { palavra, categoryIds, order } = req.body || {};
+        const processedPalavra = (palavra || '').trim();
+        const processedOrder = order ? parseInt(order, 10) : null; 
 
-        if (!processedHint || !processedAnswer) {
+        if (!processedPalavra) {
             if (req.file) { fs.unlinkSync(req.file.path); }
-            return res.status(400).json({ error: 'Dica e Resposta são obrigatórias.' });
+            return res.status(400).json({ error: 'Palavra é obrigatória.' });
         }
 
         if (!req.file) {
             return res.status(400).json({ error: 'Um arquivo de imagem é obrigatório para um novo item.' });
         }
 
-        const imageUrl = `/characters/${req.file.filename}`; 
+        const imageUrl = `/conexao_images/${req.file.filename}`; 
 
-        let imagemOcultaId;
+        let conexaoId;
         try {
             await runAsync("BEGIN TRANSACTION");
-            const result = await runAsync("INSERT INTO imagem_oculta (hint, answer, imageUrl, order_idx) VALUES (?, ?, ?, ?)", [processedHint, processedAnswer, imageUrl, processedOrder]);
-            imagemOcultaId = result.lastID;
+            const result = await runAsync("INSERT INTO conexao (palavra, imageUrl, order_idx) VALUES (?, ?, ?)", [processedPalavra, imageUrl, processedOrder]);
+            conexaoId = result.lastID;
 
             if (categoryIds) {
                 const parsedCategoryIds = JSON.parse(categoryIds);
                 if (Array.isArray(parsedCategoryIds) && parsedCategoryIds.length > 0) {
                     for (const categoryId of parsedCategoryIds) {
-                        await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, imagemOcultaId]); // CORRIGIDO: Usando category_imagem_oculta
+                        await runAsync("INSERT INTO category_conexao (category_id, conexao_id) VALUES (?, ?)", [categoryId, conexaoId]); // CORRIGIDO: Usando category_conexao
                     }
                 }
             }
             await runAsync("COMMIT"); 
 
-            res.status(201).json({ id: imagemOcultaId, hint: processedHint, answer: processedAnswer, imageUrl, order_idx: processedOrder, categoryIds: categoryIds ? JSON.parse(categoryIds) : [] });
+            res.status(201).json({ id: conexaoId, palavra: processedPalavra, imageUrl, order_idx: processedOrder, categoryIds: categoryIds ? JSON.parse(categoryIds) : [] });
         } catch (dbErr) {
             await runAsync("ROLLBACK"); 
-            console.error('Erro ao criar Imagem Oculta no DB:', dbErr);
+            console.error('Erro ao criar Conexão no DB:', dbErr);
             if (req.file) {
                 fs.unlinkSync(req.file.path);
             }
@@ -162,7 +157,7 @@ router.post('/admin/imagem-oculta', (req, res, next) => {
     });
 });
 
-router.put('/admin/imagem-oculta/:id', (req, res, next) => {
+router.put('/admin/conexao/:id', (req, res, next) => {
     upload.single('image')(req, res, async (err) => {
         if (err) {
             console.error('Multer error during PUT:', err);
@@ -174,15 +169,13 @@ router.put('/admin/imagem-oculta/:id', (req, res, next) => {
         }
 
         const { id } = req.params;
-        const { hint, answer, categoryIds, existingImageUrl, order } = req.body || {};
+        const { palavra, categoryIds, existingImageUrl, order } = req.body || {};
+        const processedPalavra = (palavra || '').trim();
+        const processedOrder = order ? parseInt(order, 10) : null; 
 
-        const processedHint = (hint || '').trim();
-        const processedAnswer = (answer || '').trim();
-        const processedOrder = order ? parseInt(order, 10) : null;
-
-        if (!processedHint || !processedAnswer) {
+        if (!processedPalavra) {
             if (req.file) { fs.unlinkSync(req.file.path); }
-            return res.status(400).json({ error: 'Dica e Resposta são obrigatórias.' });
+            return res.status(400).json({ error: 'Palavra é obrigatória.' });
         }
 
         let newImageUrl = existingImageUrl;
@@ -191,16 +184,16 @@ router.put('/admin/imagem-oculta/:id', (req, res, next) => {
         try {
             await runAsync("BEGIN TRANSACTION");
 
-            const existingItem = await getAsync("SELECT imageUrl FROM imagem_oculta WHERE id = ?", [id]);
+            const existingItem = await getAsync("SELECT imageUrl FROM conexao WHERE id = ?", [id]);
             if (!existingItem) {
                 await runAsync("ROLLBACK");
                 if (req.file) { fs.unlinkSync(req.file.path); }
-                return res.status(404).json({ message: 'Item de Imagem Oculta não encontrado.' });
+                return res.status(404).json({ message: 'Item de Conexão não encontrado.' });
             }
             oldImageUrlPath = existingItem.imageUrl;
 
             if (req.file) { 
-                newImageUrl = `/characters/${req.file.filename}`;
+                newImageUrl = `/conexao_images/${req.file.filename}`;
                 if (oldImageUrlPath && getFullPath(oldImageUrlPath) !== getFullPath(newImageUrl)) {
                     const fullOldImagePath = getFullPath(oldImageUrlPath);
                     if (fullOldImagePath && fs.existsSync(fullOldImagePath)) {
@@ -223,30 +216,30 @@ router.put('/admin/imagem-oculta/:id', (req, res, next) => {
             }
 
             const result = await runAsync(
-                "UPDATE imagem_oculta SET hint = ?, answer = ?, imageUrl = ?, order_idx = ? WHERE id = ?",
-                [processedHint, processedAnswer, newImageUrl, processedOrder, id]
+                "UPDATE conexao SET palavra = ?, imageUrl = ?, order_idx = ? WHERE id = ?",
+                [processedPalavra, newImageUrl, processedOrder, id]
             );
             if (result.changes === 0) {
                 await runAsync("ROLLBACK");
                 if (req.file) { fs.unlinkSync(req.file.path); }
-                return res.status(404).json({ message: 'Item de Imagem Oculta não encontrado.' });
+                return res.status(404).json({ message: 'Item de Conexão não encontrado.' });
             }
 
-            await runAsync("DELETE FROM category_imagem_oculta WHERE imagem_oculta_id = ?", [id]); // CORRIGIDO: Usando category_imagem_oculta
+            await runAsync("DELETE FROM category_conexao WHERE conexao_id = ?", [id]); // CORRIGIDO: Usando category_conexao
             if (categoryIds) {
                 const parsedCategoryIds = JSON.parse(categoryIds);
                 if (Array.isArray(parsedCategoryIds) && parsedCategoryIds.length > 0) {
                     for (const categoryId of parsedCategoryIds) {
-                        await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, id]); // CORRIGIDO: Usando category_imagem_oculta
+                        await runAsync("INSERT INTO category_conexao (category_id, conexao_id) VALUES (?, ?)", [categoryId, id]); // CORRIGIDO: Usando category_conexao
                     }
                 }
             }
 
             await runAsync("COMMIT");
-            res.json({ message: 'Imagem Oculta atualizada com sucesso.', id, hint: processedHint, answer: processedAnswer, imageUrl: newImageUrl, order_idx: processedOrder, categoryIds: categoryIds ? JSON.parse(categoryIds) : [] });
+            res.json({ message: 'Conexão atualizada com sucesso.', id, palavra: processedPalavra, imageUrl: newImageUrl, order_idx: processedOrder, categoryIds: categoryIds ? JSON.parse(categoryIds) : [] });
         } catch (dbErr) {
             await runAsync("ROLLBACK");
-            console.error('Erro ao atualizar Imagem Oculta no DB:', dbErr);
+            console.error('Erro ao atualizar Conexão no DB:', dbErr);
             if (req.file) {
                 fs.unlinkSync(req.file.path);
             }
@@ -255,16 +248,16 @@ router.put('/admin/imagem-oculta/:id', (req, res, next) => {
     });
 });
 
-router.delete('/admin/imagem-oculta/:id', async (req, res) => {
+router.delete('/admin/conexao/:id', async (req, res) => {
     try {
-        const itemToDelete = await getAsync("SELECT imageUrl FROM imagem_oculta WHERE id = ?", [req.params.id]);
+        const itemToDelete = await getAsync("SELECT imageUrl FROM conexao WHERE id = ?", [req.params.id]);
         if (!itemToDelete) {
-            return res.status(404).json({ error: 'Item de Imagem Oculta não encontrado.' });
+            return res.status(404).json({ error: 'Item de Conexão não encontrado.' });
         }
 
-        const result = await runAsync("DELETE FROM imagem_oculta WHERE id = ?", [req.params.id]);
+        const result = await runAsync("DELETE FROM conexao WHERE id = ?", [req.params.id]);
         if (result.changes === 0) {
-            return res.status(404).json({ error: 'Item de Imagem Oculta não encontrado.' });
+            return res.status(404).json({ error: 'Item de Conexão não encontrado.' });
         }
 
         if (itemToDelete.imageUrl) {
@@ -275,11 +268,11 @@ router.delete('/admin/imagem-oculta/:id', async (req, res) => {
             }
         }
         
-        await runAsync("DELETE FROM category_imagem_oculta WHERE imagem_oculta_id = ?", [req.params.id]); // CORRIGIDO: Usando category_imagem_oculta
+        await runAsync("DELETE FROM category_conexao WHERE conexao_id = ?", [req.params.id]); // CORRIGIDO: Usando category_conexao
 
-        res.json({ message: 'Imagem Oculta excluída com sucesso.' });
+        res.json({ message: 'Conexão excluída com sucesso.' });
     } catch (err) {
-        console.error('Erro ao excluir Imagem Oculta:', err);
+        console.error('Erro ao excluir Conexão:', err);
         res.status(500).json({ error: err.message });
     }
 });

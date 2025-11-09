@@ -19,7 +19,6 @@ export default defineComponent({
 .game-active-header {
   width: 100%;
   background-color: #ffffff;
-  padding: 5px 5px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
@@ -27,7 +26,7 @@ export default defineComponent({
   position: sticky;
   top: 0;
   z-index: 1000;
-  margin-bottom: 25px;
+  justify-content:center
 }
 
 .game-header-brand {

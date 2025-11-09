@@ -73,7 +73,7 @@ export default defineComponent({
     const editingCategory = ref<Category>({ id: 0, name: '' }); // Usado para adicionar e editar
     const showForm = ref(false); // NOVO: Estado para controlar a visibilidade do formulário
 
-    const API_URL = 'http://localhost:3001/api/admin/categories'; // Ajuste a porta se necessário
+    const API_URL = import.meta.env.VITE_API_BASE_URL + '/api/admin/categories'; // Ajuste a porta se necessário
 
     const fetchCategories = async () => {
       try {

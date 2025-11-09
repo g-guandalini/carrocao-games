@@ -4,13 +4,10 @@
       <div class="sidebar-header">
         <img src="/logo_sitio.png" alt="Admin Carroção Logo" class="sidebar-logo" />
       </div>
-      <nav class="sidebar-nav">
+
+      <!-- Navegação Principal (excluindo "Voltar ao Jogo") -->
+      <nav class="sidebar-nav-main">
         <ul>
-          <li>
-            <router-link :to="{ name: 'Home' }" class="nav-link">
-              <i class="fas fa-home"></i> Voltar ao Jogo
-            </router-link>
-          </li>
           <li>
             <router-link :to="{ name: 'AdminCategories' }" class="nav-link">
               <i class="fas fa-tags"></i> Categorias
@@ -21,20 +18,36 @@
               <i class="fas fa-image"></i> Imagem Oculta
             </router-link>
           </li>
+          <li>
+            <router-link :to="{ name: 'AdminConexao' }" class="nav-link">
+              <i class="fas fa-plug"></i> Conexão
+            </router-link>
+          </li>
         </ul>
       </nav>
-      <!-- NOVO: Footer do Sidebar -->
+
+      <!-- Novo: Contêiner para o botão "Voltar ao Jogo" na parte inferior -->
+      <div class="sidebar-bottom-action">
+        <router-link :to="{ name: 'Home' }" class="nav-link">
+          <i class="fas fa-home"></i> Voltar ao Jogo
+        </router-link>
+      </div>
+
+      <!-- Footer do Sidebar -->
       <div class="sidebar-footer">
         Desenvolvido por: Guandalini
       </div>
     </aside>
 
     <main class="admin-content">
-      <div class="admin-content-header">
-        <h2 class="page-title">{{ $route.meta.title || $route.name }}</h2>
-      </div>
-      <div class="admin-content-body">
-        <slot></slot>
+      <!-- NOVO: Wrapper para aplicar o padding e permitir que o admin-content gerencie o scroll -->
+      <div class="admin-content-wrapper">
+        <div class="admin-content-header">
+          <h2 class="page-title">{{ $route.meta.title || $route.name }}</h2>
+        </div>
+        <div class="admin-content-body">
+          <slot></slot>
+        </div>
       </div>
     </main>
   </div>
@@ -49,9 +62,17 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Adicionado: Garante que o HTML e o Body preencham a tela e evitam a rolagem da página inteira */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%; /* Garante que o body tenha altura para 'vh' e '%' funcionarem */
+  overflow: hidden; /* Impede que a barra de rolagem apareça no corpo da página */
+}
+
 .admin-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh; /* O layout principal sempre ocupará 100% da altura da viewport */
   background-color: #f0f2f5;
   font-family: 'Poppins', sans-serif;
 }
@@ -60,40 +81,43 @@ export default defineComponent({
   width: 250px;
   background-color: #363435; /* Cor de fundo do menu */
   color: #ecf0f1;
-  padding: 0; /* Removido padding vertical para controle mais preciso */
+  padding: 0;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Distribui o espaço entre header, nav e footer */
+  justify-content: space-between;
+  height: 100%; /* Ocupa 100% da altura do seu pai (.admin-layout) */
 }
 
 .sidebar-header {
-  padding: 20px; /* Adicionado padding para o logo */
+  padding: 20px;
   border-bottom: 1px solid #4a4849;
-  background-color: white; /* NOVO: Fundo branco para o logo */
+  background-color: white;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .sidebar-logo {
-  max-width: 180px; /* Ajuste o tamanho máximo do logo conforme necessário */
+  max-width: 180px;
   height: auto;
   display: block;
 }
 
-.sidebar-nav {
-  flex-grow: 1; /* Permite que o nav ocupe o espaço restante */
-  padding: 20px 0; /* Adicionado padding para o menu de navegação */
+/* Antigo .sidebar-nav, agora renomeado e com flex-grow */
+.sidebar-nav-main {
+  flex-grow: 1; /* Permite que esta seção ocupe o espaço vertical restante no sidebar */
+  padding: 20px 0;
+  overflow-y: auto; /* A barra de rolagem aparecerá aqui se os itens de navegação estourarem */
 }
 
-.sidebar-nav ul {
+.sidebar-nav-main ul {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.sidebar-nav li {
+.sidebar-nav-main li {
   margin-bottom: 5px;
 }
 
@@ -125,20 +149,35 @@ export default defineComponent({
   font-weight: 600;
 }
 
-/* NOVO: Estilo para o footer do Sidebar */
+.sidebar-bottom-action {
+  padding: 10px 0;
+  border-top: 1px solid #4a4849;
+  margin-bottom: 0;
+}
+
 .sidebar-footer {
   padding: 20px;
   text-align: center;
   font-size: 0.9em;
-  color: #b0b0b0; /* Cor cinza claro para o texto do footer */
-  border-top: 1px solid #4a4849; /* Uma linha para separar do conteúdo acima */
+  color: #b0b0b0;
+  border-top: 1px solid #4a4849;
 }
 
 .admin-content {
-  flex-grow: 1;
-  padding: 30px;
+  flex-grow: 1; /* Ocupa todo o espaço horizontal restante */
+  height: 100%; /* Ocupa 100% da altura do seu pai (.admin-layout) */
+  overflow-y: auto; /* **ESSENCIAL**: A barra de rolagem aparecerá aqui para o conteúdo principal */
   display: flex;
   flex-direction: column;
+  /* O padding foi movido para o .admin-content-wrapper */
+}
+
+/* NOVO: Wrapper para o conteúdo principal para aplicar o padding */
+.admin-content-wrapper {
+  flex-grow: 1; /* Ocupa todo o espaço vertical disponível dentro de .admin-content */
+  display: flex;
+  flex-direction: column;
+  padding: 30px; /* O padding é aplicado aqui, dentro da área de rolagem */
 }
 
 .admin-content-header {
@@ -158,6 +197,6 @@ export default defineComponent({
   padding: 25px;
   border-radius: 10px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  flex-grow: 1;
+  flex-grow: 1; /* Permite que o corpo do conteúdo principal ocupe o espaço restante */
 }
 </style>

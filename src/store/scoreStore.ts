@@ -1,9 +1,9 @@
 // src/store/scoreStore.ts
 import { reactive } from 'vue';
 import { TeamColor, ScoreState, Score } from '../types'; // Precisaremos ajustar types.ts
-import { addToast } from './toastStore';
 
-const API_BASE_URL = 'http://localhost:3001'; // A URL do seu backend
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Estado inicial das pontuações (pode ser preenchido pela API)
 const initialScoreState: ScoreState = {
@@ -35,7 +35,7 @@ export async function fetchScores() {
     console.log('Scores carregados do banco de dados:', scores);
   } catch (error) {
     console.error('Falha ao buscar scores:', error);
-    addToast('Erro ao carregar pontuações do servidor!', 'error');
+    
   } finally {
     scoreStore.isLoadingScores = false;
   }
@@ -85,7 +85,7 @@ export async function resetScores() {
     scoreStore.score = { ...initialScoreState.score }; // Zera os scores locais
   } catch (error) {
     console.error('Falha ao resetar pontuações no backend:', error);
-    addToast('Erro ao resetar pontuações no servidor! Tente novamente.', 'error');
+    
   }
 }
 

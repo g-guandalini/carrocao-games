@@ -13,21 +13,19 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, type StyleValue, type CSSProperties } from 'vue';
 
-// Interface para representar cada ladrilho da imagem
 interface TileConfig {
   id: number;
   originalGridPos: { row: number; col: number };
   bgPosition: { x: number; y: number };
-  revealOrderIndex: number; // Índice na ordem aleatória de revelação
+  revealOrderIndex: number;
 }
 
-// Interface para representar o ladrilho como ele é renderizado no VUE
 interface DisplayTile {
   id: number;
   originalGridPos: { row: number; col: number };
   bgPosition: { x: number; y: number };
-  currentDisplayPos: { x: number; y: number }; // Posição visual atual (sempre a correta)
-  isVisible: boolean; // NOVO: Indicador se o tile deve estar visível
+  currentDisplayPos: { x: number; y: number };
+  isVisible: boolean;
 }
 
 export default defineComponent({
@@ -39,44 +37,66 @@ export default defineComponent({
     },
     revealProgress: {
       type: Number,
-      default: 0, // 0 = totalmente oculta, 1 = totalmente revelada
+      default: 0,
     },
     gridSize: {
       type: Number,
-      default: 10, // AJUSTADO: Padrão para 10, conforme sua necessidade
+      default: 10,
     },
     imageWidth: {
       type: Number,
-      default: 500, // Largura esperada da imagem para o tiling
+      default: 500,
     },
     imageHeight: {
       type: Number,
-      default: 350, // Altura esperada da imagem para o tiling
+      default: 350,
     },
   },
   setup(props) {
-    const tiles = ref<DisplayTile[]>([]); // Estado reativo dos tiles
-    const initialTileData = ref<TileConfig[]>([]); // Dados base dos tiles
+    const tiles = ref<DisplayTile[]>([]);
+    const initialTileData = ref<TileConfig[]>([]);
+    const randomizedRevealOrder = ref<number[]>([]);
+    let lastTrackedKey = '';
 
     const totalTiles = computed(() => props.gridSize * props.gridSize);
     const tileWidth = computed(() => props.imageWidth / props.gridSize);
     const tileHeight = computed(() => props.imageHeight / props.gridSize);
 
-    // Função para inicializar os tiles (chama quando a imagem ou gridSize muda)
+    const generateRevealOrder = (count: number) => {
+      const newRevealOrder = Array.from({ length: count }, (_, i) => i);
+      for (let i = newRevealOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newRevealOrder[i], newRevealOrder[j]] = [newRevealOrder[j], newRevealOrder[i]];
+      }
+      randomizedRevealOrder.value = newRevealOrder;
+    };
+
     const initializeTiles = async () => {
       if (!props.imageUrl) {
         tiles.value = [];
         initialTileData.value = [];
+        randomizedRevealOrder.value = [];
+        lastTrackedKey = '';
         return;
       }
 
-      const tempInitialTileData: TileConfig[] = [];
+      const currentKey = `${props.imageUrl}-${props.gridSize}`;
+      if (currentKey !== lastTrackedKey) {
+        generateRevealOrder(totalTiles.value);
+        lastTrackedKey = currentKey;
+      }
+      if (randomizedRevealOrder.value.length !== totalTiles.value && totalTiles.value > 0) {
+          generateRevealOrder(totalTiles.value);
+      }
+      if (randomizedRevealOrder.value.length === 0 && totalTiles.value > 0) {
+        generateRevealOrder(totalTiles.value);
+      }
 
+      const tempInitialTileData: TileConfig[] = [];
       for (let i = 0; i < totalTiles.value; i++) {
         const row = Math.floor(i / props.gridSize);
         const col = i % props.gridSize;
 
-        // Calcula a posição do background para cada tile (mostrando a parte correta da imagem)
         const bgX = -col * tileWidth.value;
         const bgY = -row * tileHeight.value;
 
@@ -84,33 +104,21 @@ export default defineComponent({
           id: i,
           originalGridPos: { row, col },
           bgPosition: { x: bgX, y: bgY },
-          revealOrderIndex: 0, // Será preenchido com uma ordem aleatória de revelação
+          revealOrderIndex: randomizedRevealOrder.value.indexOf(i),
         });
       }
 
-      // Gera uma ordem aleatória para quais tiles serão "revelados" primeiro
-      const revealOrder = Array.from({ length: totalTiles.value }, (_, i) => i); // Array [0, 1, ..., N-1]
-      for (let i = revealOrder.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [revealOrder[i], revealOrder[j]] = [revealOrder[j], revealOrder[i]];
-      }
-
-      // Atribui o índice de ordem de revelação
-      initialTileData.value = tempInitialTileData.map(data => ({
-        ...data,
-        revealOrderIndex: revealOrder.indexOf(data.id), // Onde este tile se encaixa na sequência de revelação
-      }));
-
-      // Aplica o progresso de revelação atual para definir o estado visual inicial
+      initialTileData.value = tempInitialTileData;
       updateTilesVisualState(props.revealProgress);
     };
 
-    // Função para atualizar o estado visual dos tiles com base no progresso de revelação
     const updateTilesVisualState = (progress: number) => {
+      if (initialTileData.value.length === 0) return;
+
       const numTilesToReveal = Math.floor(progress * totalTiles.value);
 
       tiles.value = initialTileData.value.map(initialData => {
-        const isVisible = initialData.revealOrderIndex < numTilesToReveal; // Tile é visível se seu índice de revelação for menor que a quantidade a ser revelada
+        const isVisible = initialData.revealOrderIndex < numTilesToReveal;
         return {
           id: initialData.id,
           originalGridPos: initialData.originalGridPos,
@@ -118,47 +126,27 @@ export default defineComponent({
           currentDisplayPos: {
               x: initialData.originalGridPos.col * tileWidth.value,
               y: initialData.originalGridPos.row * tileHeight.value
-          }, // Tiles estão sempre em suas posições corretas
-          isVisible: isVisible, // NOVO: Controla a visibilidade
+          },
+          isVisible: isVisible,
         } satisfies DisplayTile;
       });
     };
 
-    // Observa mudanças na URL da imagem para re-inicializar os tiles
-    watch(() => props.imageUrl, initializeTiles, { immediate: true });
-    // Observa mudanças no progresso de revelação para atualizar o estado visual dos tiles
+    watch(() => [props.imageUrl, props.gridSize], initializeTiles, { immediate: true });
+
+    watch(
+      () => [props.imageWidth, props.imageHeight],
+      ([newImageWidth, newImageHeight], oldValues) => {
+        if (oldValues && (newImageWidth !== oldValues[0] || newImageHeight !== oldValues[1]) && props.imageUrl) {
+          initializeTiles();
+        }
+      }
+    );
+
     watch(() => props.revealProgress, (newProgress) => {
       updateTilesVisualState(newProgress);
     });
-    // Observa mudanças no gridSize ou nas dimensões para re-inicializar
-    // É importante reagir a imageWidth/imageHeight para recalcular os tiles
-    watch(
-      () => [props.gridSize, props.imageWidth, props.imageHeight],
-      ([newGridSize, newImageWidth, newImageHeight], oldValues) => { // 'oldValues' é um array, mas pode ser undefined na primeira execução
-        if (oldValues === undefined) {
-          // Na primeira execução com 'immediate: true', oldValues é undefined.
-          // Consideramos que houve uma mudança que justifica a inicialização.
-          initializeTiles();
-          return;
-        }
 
-        // Se oldValues não for undefined, podemos desestruturá-lo com segurança
-        const [oldGridSize, oldImageWidth, oldImageHeight] = oldValues;
-
-        // Apenas inicialize novamente se houver uma mudança real nas propriedades que afetam o layout dos tiles
-        if (
-          newGridSize !== oldGridSize ||
-          newImageWidth !== oldImageWidth ||
-          newImageHeight !== oldImageHeight
-        ) {
-          initializeTiles();
-        }
-      },
-      { immediate: true }
-    );
-
-
-    // Gera o estilo CSS para cada tile
     const getTileStyle = (tile: DisplayTile): CSSProperties => ({
       width: `${tileWidth.value}px`,
       height: `${tileHeight.value}px`,
@@ -173,7 +161,6 @@ export default defineComponent({
       backgroundColor: '#34495e',
     });
 
-    // Estilo para o container principal que mantém os tiles
     const containerStyle = computed<StyleValue>(() => ({
       width: `${props.imageWidth}px`,
       height: `${props.imageHeight}px`,
@@ -182,7 +169,7 @@ export default defineComponent({
       borderRadius: '12px',
       boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
       border: '2px solid #bdc3c7',
-      overflow: 'hidden', // NOVO: Garante que o ImageTiler gerencie seu próprio overflow
+      overflow: 'hidden',
     }));
 
     return {
@@ -197,8 +184,8 @@ export default defineComponent({
 <style scoped>
 .image-tiler-container {
   display: block;
-  /* NOVO: Descomentado/Adicionado para garantir o corte interno se necessário */
   overflow: hidden;
+  box-sizing: border-box; /* Adicionado: Para incluir a borda de 2px nas dimensões */
 }
 
 .image-tile {

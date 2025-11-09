@@ -79,15 +79,14 @@ async function createTables() {
                 hint TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 imageUrl TEXT NOT NULL,
-                order_idx INTEGER DEFAULT NULL -- Coluna order_idx agora sempre presente na criação
+                order_idx INTEGER DEFAULT NULL
             );
         `);
         console.log('Tabela "imagem_oculta" criada ou já existe.');
 
-        // **Lógica de Migração:** Verifica e adiciona a coluna order_idx se ela não existir
-        // Isso é crucial para bancos de dados existentes criados antes da adição da coluna.
-        const tableInfo = await allAsync("PRAGMA table_info(imagem_oculta)");
-        const hasOrderColumn = tableInfo.some(col => col.name === 'order_idx');
+        // Lógica de Migração: Verifica e adiciona a coluna order_idx se ela não existir para imagem_oculta
+        let tableInfo = await allAsync("PRAGMA table_info(imagem_oculta)");
+        let hasOrderColumn = tableInfo.some(col => col.name === 'order_idx');
 
         if (!hasOrderColumn) {
             console.log('Coluna "order_idx" não encontrada na tabela "imagem_oculta". Adicionando...');
@@ -117,6 +116,47 @@ async function createTables() {
         `);
         console.log('Tabela "scores" criada ou já existe.');
 
+        // =========================================================
+        //                 NOVAS TABELAS PARA CONEXÃO (COM order_idx)
+        // =========================================================
+
+        // Tabela Conexao
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS conexao (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                palavra TEXT NOT NULL,
+                imageUrl TEXT NOT NULL,
+                order_idx INTEGER DEFAULT NULL -- Adicionado order_idx aqui
+            );
+        `);
+        console.log('Tabela "conexao" criada ou já existe.');
+
+        // Lógica de Migração: Verifica e adiciona a coluna order_idx se ela não existir para conexao
+        tableInfo = await allAsync("PRAGMA table_info(conexao)");
+        hasOrderColumn = tableInfo.some(col => col.name === 'order_idx');
+
+        if (!hasOrderColumn) {
+            console.log('Coluna "order_idx" não encontrada na tabela "conexao". Adicionando...');
+            await runAsync("ALTER TABLE conexao ADD COLUMN order_idx INTEGER DEFAULT NULL");
+            console.log('Coluna "order_idx" adicionada com sucesso à tabela "conexao".');
+        }
+
+        // Tabela de relacionamento category_conexao
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS category_conexao (
+                category_id INTEGER NOT NULL,
+                conexao_id INTEGER NOT NULL,
+                PRIMARY KEY (category_id, conexao_id),
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
+                FOREIGN KEY (conexao_id) REFERENCES conexao(id) ON DELETE CASCADE
+            );
+        `);
+        console.log('Tabela "category_conexao" criada ou já existe.');
+
+        // =========================================================
+        //            FIM DAS NOVAS TABELAS PARA CONEXÃO
+        // =========================================================
+
     } catch (error) {
         console.error('Erro durante a criação ou migração de tabelas:', error);
         throw error; // Rejeita a Promise para que o erro seja propagado
@@ -144,7 +184,7 @@ async function seedInitialData() {
     // Personagens iniciais
     const ALL_CHARACTERS = [
         { name: 'Mickey Mouse', imageUrl: '/characters/mickey.png', hint: 'Um famoso rato falante de desenhos animados.', categoryNames: ['Personagens', 'Animais'], order: 1 },
-        { name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png', hint: 'Um herói que escala paredes e solta teias.', categoryNames: ['Personagens'], order: 2 },
+        { name: 'Homem Aranha', imageUrl: '/characters/homem_arananha.png', hint: 'Um herói que escala paredes e solta teias.', categoryNames: ['Personagens'], order: 2 },
         { name: 'Pikachu', imageUrl: '/characters/pikachu.png', hint: 'Um monstrinho amarelo que libera choques elétricos.', categoryNames: ['Personagens', 'Animais'], order: 3 },
         { name: 'Goku', imageUrl: '/characters/goku.png', hint: 'Um guerreiro alienígena com cabelo espetado que adora lutar.', categoryNames: ['Personagens'], order: 4 },
         { name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png', hint: 'Um bilionário que usa uma armadura de alta tecnologia.', categoryNames: ['Personagens', 'Objetos'], order: 5 },
@@ -161,7 +201,6 @@ async function seedInitialData() {
         const categoryMap = new Map(existingCategories.map(cat => [cat.name, cat.id]));
 
         for (const char of ALL_CHARACTERS) {
-            // Adicionado 'order_idx' na query e nos parâmetros
             const result = await runAsync("INSERT INTO imagem_oculta (hint, answer, imageUrl, order_idx) VALUES (?, ?, ?, ?)", [char.hint, char.name, char.imageUrl, char.order]);
             const imagemOcultaId = result.lastID;
 
@@ -191,6 +230,46 @@ async function seedInitialData() {
     } else {
         console.log('Tabela "scores" já contém dados. Ignorando seeding.');
     }
+
+    // =========================================================
+    //              NOVO SEEDING PARA CONEXÃO (COM order_idx)
+    // =========================================================
+
+    const ALL_CONEXOES = [
+        { palavra: 'Maçã', imageUrl: '/conexao_images/maca.png', categoryNames: ['Comida', 'Objetos'], order: 1 },
+        { palavra: 'Cachorro', imageUrl: '/conexao_images/cachorro.png', categoryNames: ['Animais'], order: 2 },
+        { palavra: 'Carro', imageUrl: '/conexao_images/carro.png', categoryNames: ['Objetos'], order: 3 },
+        { palavra: 'Banana', imageUrl: '/conexao_images/banana.png', categoryNames: ['Comida'], order: 4 },
+    ];
+
+    const conexaoCountRow = await getAsync("SELECT COUNT(*) AS count FROM conexao");
+    if (conexaoCountRow && conexaoCountRow.count === 0) {
+        console.log('Populando "conexao" com dados iniciais...');
+        const existingCategories = await allAsync("SELECT id, name FROM categories");
+        const categoryMap = new Map(existingCategories.map(cat => [cat.name, cat.id]));
+
+        for (const con of ALL_CONEXOES) {
+            // Adicionado 'order_idx' na query e nos parâmetros
+            const result = await runAsync("INSERT INTO conexao (palavra, imageUrl, order_idx) VALUES (?, ?, ?)", [con.palavra, con.imageUrl, con.order]);
+            const conexaoId = result.lastID;
+
+            for (const catName of con.categoryNames) {
+                const categoryId = categoryMap.get(catName);
+                if (categoryId) {
+                    await runAsync("INSERT INTO category_conexao (category_id, conexao_id) VALUES (?, ?)", [categoryId, conexaoId]);
+                } else {
+                    console.warn(`Categoria '${catName}' não encontrada para a conexão '${con.palavra}'.`);
+                }
+            }
+        }
+        console.log('Dados iniciais de conexao e associações inseridos com sucesso.');
+    } else {
+        console.log('Tabela "conexao" já contém dados. Ignorando seeding.');
+    }
+
+    // =========================================================
+    //            FIM DO NOVO SEEDING PARA CONEXÃO
+    // =========================================================
 }
 
 /**

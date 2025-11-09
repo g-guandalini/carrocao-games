@@ -1,15 +1,18 @@
 // src/store/adminStore.ts
 import { reactive } from 'vue';
-import { AdminState, Category, ImagemOcultaItem } from '../types';
+import { AdminState } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const initialState: AdminState = {
   categories: [],
   imagemOcultaItems: [],
+  conexaoItems: [], // Adicionado conforme a nova interface
   isLoadingCategories: false,
   isLoadingImagemOculta: false,
+  isLoadingConexao: false, // Adicionado conforme a nova interface
   selectedImagemOcultaItem: null,
+  selectedConexaoItem: null, // Adicionado conforme a nova interface
 };
 
 export const adminStore = reactive<AdminState>({ ...initialState });

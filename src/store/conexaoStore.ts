@@ -377,7 +377,7 @@ export function selectConexaoTeam(team: TeamColor) {
   }
 }
 
-export async function handleOperatorConexaoFeedback(isCorrect: boolean, scoreAwarded: number) {
+export async function handleOperatorConexaoFeedback(isCorrect: boolean) {
   if (!conexaoStore.activeTeam || !conexaoStore.currentRoundConexao) {
     console.warn("Feedback do operador de Conexão recebido em um estado inválido ou sem time ativo.");
     return;

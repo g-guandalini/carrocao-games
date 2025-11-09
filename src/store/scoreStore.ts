@@ -1,6 +1,6 @@
 // src/store/scoreStore.ts
 import { reactive } from 'vue';
-import { TeamColor, ScoreState, Score } from '../types'; // Precisaremos ajustar types.ts
+import { TeamColor, ScoreState } from '../types'; // Precisaremos ajustar types.ts
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;

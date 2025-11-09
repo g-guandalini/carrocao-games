@@ -33,7 +33,7 @@ interface Particle {
 export default defineComponent({
   name: 'SplashScreen',
   emits: ['select-bug'],
-  setup(props, { emit }) {
+  setup(_props, { emit }) {
     const router = useRouter();
 
     const hasScoresToClear = computed(() => {

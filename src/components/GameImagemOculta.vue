@@ -70,7 +70,6 @@ import {
   proceedToRevealImagemOculta,
   viewImagemOcultaScoreboard
 } from '../store/imagemOcultaStore';
-import { scoreStore } from '../store/scoreStore';
 
 export default defineComponent({
   name: 'GameImagemOculta',
@@ -115,7 +114,7 @@ export default defineComponent({
 
     const displayedHint = ref('');
     const isTyping = ref(false);
-    let typingInterval: number | null = null;
+    let typingInterval: ReturnType<typeof setInterval> | null = null;
 
     const winningTeamColorHex = ref<string | null>(null);
     const showFireworks = ref(false);

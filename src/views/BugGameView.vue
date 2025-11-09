@@ -1,30 +1,7 @@
 <!-- views/BugGameView.vue -->
 <template>
-    <div class="bug-game-view">
-      <h1>Em Desenvolvimento</h1>
-      <button @click="goHome">Voltar ao Menu Principal</button>
-    </div>
+
   </template>
-  
-  <script lang="ts">
-  import { defineComponent } from 'vue';
-  import { resetGameScores } from '../store/imagemOcultaStore'; // Para resetar o gameStore ao sair
-  
-  export default defineComponent({
-    name: 'BugGameView',
-    emits: ['go-to-main-menu'], // Emitirá este evento para o GameView
-    setup(_props, { emit }) {
-      const goHome = () => {
-        resetGameScores(); // Reseta o estado do jogo Imagem Oculta se algo estiver ativo
-        emit('go-to-main-menu'); // Notifica GameView para voltar à SplashScreen
-      };
-  
-      return {
-        goHome,
-      };
-    },
-  });
-  </script>
   
   <style scoped>
   .bug-game-view {

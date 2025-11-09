@@ -62,7 +62,7 @@ export default defineComponent({
 
     const handleOperatorFeedback = (isCorrect: boolean, scoreAwarded: number) => {
       console.log(`[ConexaoView] Recebido feedback do operador: Correto? ${isCorrect}, Pontuação: ${scoreAwarded}`);
-      handleOperatorConexaoFeedback(isCorrect, scoreAwarded);
+      handleOperatorConexaoFeedback(isCorrect);
     };
 
     const handleGlobalKeyDown = (event: KeyboardEvent) => {

@@ -156,4 +156,6 @@ export async function updateImagemOcultaItem(id: number, item: { hint?: string; 
     return data;
   } catch (error: any) {
     console.error('Erro ao atualizar item de imagem oculta:', error);
-    add
+    throw error;
+  }
+}

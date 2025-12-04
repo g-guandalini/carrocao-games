@@ -15,10 +15,9 @@
     <div v-show="gameStatus !== 'hint' && gameStatus !== 'scoreboard'"
          class="image-display"
          ref="imageDisplayRef">
-      <!-- NOVO: image-frame-container para envolver o ImageTiler e aplicar a borda dinamicamente -->
       <div class="image-frame-container"
            :style="{
-             borderColor: imageBorderColor ? imageBorderColor : 'transparent',
+             border: imageBorderColor ? `${BORDER_SIZE_PX}px solid ${imageBorderColor}` : 'none',
              width: imageFrameComputedWidth,
              height: imageFrameComputedHeight
            }">
@@ -34,22 +33,25 @@
       </div>
     </div>
 
-    <!-- Texto "Pontos em jogo" visível durante as fases 'guessing' ou 'revealing' -->
-    <p class="game-info-text" v-if="gameStatus === 'guessing' || gameStatus === 'revealing'">
-      Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
+    <!-- Texto de informação do jogo, agora usando v-if para remover do DOM quando não relevante -->
+    <p v-if="gameStatus === 'guessing' || gameStatus === 'revealing' || gameStatus === 'finished'"
+       class="game-info-text">
+      <template v-if="gameStatus === 'guessing' || gameStatus === 'revealing'">
+        Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
+      </template>
+      <template v-else-if="gameStatus === 'finished' && currentRoundCharacter">
+        Resposta: <strong>{{ currentRoundCharacter?.name }}</strong>
+      </template>
     </p>
 
-    <!-- Exibição da resposta correta quando o jogo está finalizado -->
-    <p class="game-info-text" v-if="gameStatus === 'finished' && currentRoundCharacter">
-      Resposta: <strong>{{ currentRoundCharacter?.name }}</strong>
-    </p>
-
-    <!-- Componente de Feedback do Operador - Visível apenas na fase 'guessing' -->
-    <AnswerFeedback
-      v-if="gameStatus === 'guessing'"
-      @correct-answer="handleCorrectAnswer"
-      @wrong-answer="handleWrongAnswer"
-    />
+    <!-- Wrapper para o Componente de Feedback do Operador - Sempre presente para manter o layout -->
+    <div class="answer-feedback-wrapper">
+      <AnswerFeedback
+        v-show="gameStatus === 'guessing'"
+        @correct-answer="handleCorrectAnswer"
+        @wrong-answer="handleWrongAnswer"
+      />
+    </div>
 
     <!-- Componente para exibir os toasts -->
     <ToastNotification />
@@ -110,7 +112,7 @@ export default defineComponent({
 
     const originalAspectRatio = 16 / 9;
     const fixedGridSize = 10;
-    const BORDER_SIZE_PX = 20;
+    const BORDER_SIZE_PX = 20; // A espessura da borda desejada quando ativa
 
     const displayedHint = ref('');
     const isTyping = ref(false);
@@ -131,7 +133,7 @@ export default defineComponent({
       if (_props.gameStatus === 'guessing' && _props.activeTeam) {
         return teamColorToHex(_props.activeTeam);
       }
-      return '';
+      return ''; // Retorna string vazia se não houver borda ativa
     });
 
     const typeHint = (fullHint: string) => {
@@ -182,84 +184,55 @@ export default defineComponent({
 
     const updateImageDimensions = () => {
       if (imageDisplayRef.value) {
-        const availableWidthForDisplay = Math.floor(imageDisplayRef.value.offsetWidth);
-        const availableHeightForDisplay = Math.floor(imageDisplayRef.value.offsetHeight);
+        const availableWidthForFrame = Math.floor(imageDisplayRef.value.offsetWidth);
+        const availableHeightForFrame = Math.floor(imageDisplayRef.value.offsetHeight);
 
-        // --- Adicionado para depuração ---
-        console.group('Debug Image Dimensions');
-        console.log('gameStatus:', _props.gameStatus);
-        console.log('imageDisplayRef.value:', imageDisplayRef.value);
-        console.log('imageDisplayRef offsetWidth:', availableWidthForDisplay);
-        console.log('imageDisplayRef offsetHeight:', availableHeightForDisplay);
-        // --- Fim da depuração ---
+        let frameTargetWidth: number;
+        let frameTargetHeight: number;
 
-        const contentWidthLimit = availableWidthForDisplay - (2 * BORDER_SIZE_PX);
-        const contentHeightLimit = availableHeightForDisplay - (2 * BORDER_SIZE_PX);
-
-        // --- Adicionado para depuração ---
-        console.log('BORDER_SIZE_PX:', BORDER_SIZE_PX);
-        console.log('contentWidthLimit (available for image content):', contentWidthLimit);
-        console.log('contentHeightLimit (available for image content):', contentHeightLimit);
-        // --- Fim da depuração ---
-
-        let finalImageContentWidth: number;
-        let finalImageContentHeight: number;
-
-        if (contentWidthLimit <= 0 || contentHeightLimit <= 0) {
-          if (calculatedImageWidth.value !== 0) calculatedImageWidth.value = 0;
-          if (calculatedImageHeight.value !== 0) calculatedImageHeight.value = 0;
-          if (imageFrameComputedWidth.value !== '0px') imageFrameComputedWidth.value = '0px';
-          if (imageFrameComputedHeight.value !== '0px') imageFrameComputedHeight.value = '0px';
-          
-          // --- Adicionado para depuração ---
-          console.error('Calculated image dimensions are zero or negative. Image will not be displayed.');
-          console.groupEnd(); // Fecha o grupo de depuração
-          // --- Fim da depuração ---
-          return;
-        }
-
-        if (contentWidthLimit / contentHeightLimit > originalAspectRatio) {
-          finalImageContentHeight = contentHeightLimit;
-          finalImageContentWidth = contentHeightLimit * originalAspectRatio;
+        // Determina o tamanho máximo que o `image-frame-container` (elemento externo) deve ocupar,
+        // mantendo a proporção dentro do espaço disponível do pai.
+        if (availableWidthForFrame / availableHeightForFrame > originalAspectRatio) {
+            frameTargetHeight = availableHeightForFrame;
+            frameTargetWidth = availableHeightForFrame * originalAspectRatio;
         } else {
-          finalImageContentWidth = contentWidthLimit;
-          finalImageContentHeight = contentWidthLimit / originalAspectRatio;
+            frameTargetWidth = availableWidthForFrame;
+            frameTargetHeight = availableWidthForFrame / originalAspectRatio;
         }
 
-        finalImageContentWidth = Math.floor(finalImageContentWidth / fixedGridSize) * fixedGridSize;
-        finalImageContentHeight = Math.floor(finalImageContentHeight / fixedGridSize) * fixedGridSize;
+        // Garante que as dimensões sejam positivas
+        frameTargetWidth = Math.max(0, frameTargetWidth);
+        frameTargetHeight = Math.max(0, frameTargetHeight);
 
-        if (finalImageContentWidth < fixedGridSize) finalImageContentWidth = fixedGridSize;
-        if (finalImageContentHeight < fixedGridSize) finalImageContentHeight = fixedGridSize;
+        // Define as dimensões computadas do frame. Estas são as dimensões *externas* do contêiner.
+        imageFrameComputedWidth.value = `${frameTargetWidth}px`;
+        imageFrameComputedHeight.value = `${frameTargetHeight}px`;
 
-        // --- Adicionado para depuração ---
-        console.log('finalImageContentWidth (after aspect ratio & gridSize adjust):', finalImageContentWidth);
-        console.log('finalImageContentHeight (after aspect ratio & gridSize adjust):', finalImageContentHeight);
-        console.groupEnd(); // Fecha o grupo de depuração
-        // --- Fim da depuração ---
+        // Agora calcula as dimensões para o ImageTiler (o conteúdo dentro do frame).
+        // Isso depende se uma borda está *atualmente* sendo aplicada.
+        // Se a borda está ativa, o conteúdo interno deve ser menor, se não, deve preencher o frame.
+        const currentBorderEffectiveThickness = _props.gameStatus === 'guessing' && _props.activeTeam ? BORDER_SIZE_PX : 0;
 
-        if (calculatedImageWidth.value !== finalImageContentWidth) {
-          calculatedImageWidth.value = finalImageContentWidth;
-        }
-        if (calculatedImageHeight.value !== finalImageContentHeight) {
-          calculatedImageHeight.value = finalImageContentHeight;
-        }
+        let innerContentWidth = Math.max(0, frameTargetWidth - (2 * currentBorderEffectiveThickness));
+        let innerContentHeight = Math.max(0, frameTargetHeight - (2 * currentBorderEffectiveThickness));
 
-        const newFrameWidth = `${finalImageContentWidth + (2 * BORDER_SIZE_PX)}px`;
-        const newFrameHeight = `${finalImageContentHeight + (2 * BORDER_SIZE_PX)}px`;
+        // Ajusta o conteúdo interno para ser um múltiplo do gridSize
+        calculatedImageWidth.value = Math.floor(innerContentWidth / fixedGridSize) * fixedGridSize;
+        calculatedImageHeight.value = Math.floor(innerContentHeight / fixedGridSize) * fixedGridSize;
 
-        if (imageFrameComputedWidth.value !== newFrameWidth) {
-          imageFrameComputedWidth.value = newFrameWidth;
-        }
-        if (imageFrameComputedHeight.value !== newFrameHeight) {
-          imageFrameComputedHeight.value = newFrameHeight;
-        }
+        // Garante um tamanho mínimo para o ImageTiler
+        if (calculatedImageWidth.value < fixedGridSize) calculatedImageWidth.value = fixedGridSize;
+        if (calculatedImageHeight.value < fixedGridSize) calculatedImageHeight.value = fixedGridSize;
+
+        // Garante que as dimensões do ImageTiler não sejam negativas
+        calculatedImageWidth.value = Math.max(0, calculatedImageWidth.value);
+        calculatedImageHeight.value = Math.max(0, calculatedImageHeight.value);
+
       } else {
-         // --- Adicionado para depuração ---
-         console.group('Debug Image Dimensions');
-         console.warn('imageDisplayRef is null. Cannot update image dimensions.');
-         console.groupEnd();
-         // --- Fim da depuração ---
+        calculatedImageWidth.value = 0;
+        calculatedImageHeight.value = 0;
+        imageFrameComputedWidth.value = '0px';
+        imageFrameComputedHeight.value = '0px';
       }
     };
 
@@ -292,11 +265,15 @@ export default defineComponent({
         stopTypingAndAudio();
       }
 
-      if (newGameStatus !== 'hint' && newGameStatus !== 'scoreboard' && newImageDisplayRef) {
+      // Chamar updateImageDimensions SEMPRE que o gameStatus mudar,
+      // para recalcular as dimensões da imagem/tiler com base na borda ativa/inativa
+      // e também quando o ImageDisplayRef ou Character mudam para reavaliar as dimensões.
+      if (newImageDisplayRef) {
         nextTick(() => {
           updateImageDimensions();
         });
       }
+
       if (newGameStatus !== 'guessing' && newGameStatus !== 'finished') {
           showFireworks.value = false;
           winningTeamColorHex.value = null;
@@ -377,6 +354,7 @@ export default defineComponent({
       winningTeamColorHex,
       showFireworks,
       viewImagemOcultaScoreboard,
+      BORDER_SIZE_PX,
     };
   },
 });
@@ -388,7 +366,7 @@ export default defineComponent({
 .game-active-section {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center; /* CENTRALIZA O CONTEÚDO VERTICALMENTE */
   align-items: center;
   width: 100%;
   height: 100%; /* Ocupa 100% da altura do PARENT (agora, o main-content-area flexível) */
@@ -409,22 +387,24 @@ export default defineComponent({
 }
 
 .hint-container {
-  flex-grow: 1;
+  /* flex-grow: 1; REMOVIDO - para que a altura seja definida pelo conteúdo */
   width: 100%;
   max-width: 1200px;
   background-color: #fcfcfc;
   border-radius: 22.5px;
   box-shadow: 0 9px 22.5px rgba(0, 0, 0, 0.1);
-  padding: 45px;
+  padding: 60px;
   text-align: center;
   box-sizing: border-box;
   border: 1.5px solid #e0e0e0;
   transition: all 0.3s ease;
-  min-height: 375px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  margin-top: 200px;
+  /* margin-top: auto; REMOVIDO - centralização feita pelo pai */
+  /* margin-bottom: auto; REMOVIDO - centralização feita pelo pai */
 }
 
 .hint-label {
@@ -445,7 +425,7 @@ export default defineComponent({
   line-height: 1.2;
   white-space: pre-wrap;
   word-break: break-word;
-  min-height: 5em;
+  min-height: 6em; /* AQUI ESTÁ A ALTERAÇÃO: Aumentado o min-height para garantir espaço vertical */
 }
 
 .blinking-cursor {
@@ -477,8 +457,7 @@ export default defineComponent({
 
 .image-frame-container {
   box-sizing: border-box;
-  border: 20px solid transparent;
-  transition: border-color 0.2s ease-in-out;
+  transition: border-color 0.2s ease-in-out, border 0.2s ease-in-out; /* Adicionado transição para a propriedade 'border' */
   border-radius: 0;
   overflow: hidden;
   display: flex;
@@ -491,12 +470,32 @@ export default defineComponent({
 }
 
 .game-info-text {
-  font-size: 2.2em;
+  font-size: 3.2em; /* AQUI ESTÁ A ALTERAÇÃO: Aumentado o font-size */
   color: #34495e;
   font-weight: 500;
   text-align: center;
   width: 100%;
   flex-shrink: 0; /* Impede que esses elementos encolham */
+  min-height: 1.2em; /* Garante que o elemento ocupe um mínimo de altura */
+}
+
+.game-info-text strong {
+  font-weight: 700; /* Novo estilo para dar mais destaque ao valor/resposta */
+  color: #2c3e50; /* Nova cor para o valor/resposta */
+}
+
+/* .u-hidden-text-placeholder foi removido, pois o v-if já cuida da remoção do DOM */
+
+.answer-feedback-wrapper {
+  /* ESTE É O NOVO BLOCO CSS CHAVE */
+  /* Ajuste este min-height conforme a altura que o AnswerFeedback ocupa quando visível */
+  min-height: 100px; /* Valor exemplo. Inspecione o AnswerFeedback para um valor preciso. */
+  display: flex; /* Para centralizar o AnswerFeedback quando visível */
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0; /* Impede que o wrapper encolha */
+  width: 100%; /* Ocupa a largura total para alinhamento */
+  box-sizing: border-box;
 }
 
 .finished-status-container {

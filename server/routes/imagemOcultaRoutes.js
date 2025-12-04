@@ -22,8 +22,8 @@ async function formatImagemOcultaWithCategories(imagemOcultaItems) {
     for (const item of imagemOcultaItems) {
         const categories = await allAsync(
             `SELECT c.id, c.name FROM categories c
-             INNER JOIN category_imagem_oculta cio ON c.id = cio.category_id -- CORRIGIDO: Usando category_imagem_oculta
-             WHERE cio.imagem_oculta_id = ?`, // CORRIGIDO: Usando category_imagem_oculta_id
+             INNER JOIN category_imagem_oculta cio ON c.id = cio.category_id
+             WHERE cio.imagem_oculta_id = ?`,
             [item.id]
         );
         formattedItems.push({ ...item, categories });
@@ -43,7 +43,7 @@ router.get('/imagem-oculta', async (req, res) => {
         if (categoryIdsQuery) {
             const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
             if (ids.length > 0) {
-                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")"; // CORRIGIDO: Usando category_imagem_oculta
+                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")"; 
                 params.push(...ids);
                 sql += " GROUP BY io.id"; 
             }
@@ -52,8 +52,6 @@ router.get('/imagem-oculta', async (req, res) => {
         sql += " ORDER BY io.order_idx IS NULL, io.order_idx ASC, io.id ASC";
 
         const imagemOculta = await allAsync(sql, params);
-        // Para o jogo, podemos retornar os itens sem as categorias aninhadas para otimização
-        // Se o frontend do jogo precisar das categorias, a função formatImagemOcultaWithCategories pode ser usada.
         res.json(imagemOculta);
     } catch (err) {
         console.error('Erro ao buscar imagens ocultas para o jogo:', err);
@@ -74,7 +72,7 @@ router.get('/admin/imagem-oculta', async (req, res) => {
         if (categoryIdsQuery) {
             const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
             if (ids.length > 0) {
-                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")"; // CORRIGIDO: Usando category_imagem_oculta
+                sql += " INNER JOIN category_imagem_oculta cio ON io.id = cio.imagem_oculta_id WHERE cio.category_id IN (" + ids.map(() => '?').join(',') + ")"; 
                 params.push(...ids);
                 sql += " GROUP BY io.id"; 
             }
@@ -144,7 +142,7 @@ router.post('/admin/imagem-oculta', (req, res, next) => {
                 const parsedCategoryIds = JSON.parse(categoryIds);
                 if (Array.isArray(parsedCategoryIds) && parsedCategoryIds.length > 0) {
                     for (const categoryId of parsedCategoryIds) {
-                        await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, imagemOcultaId]); // CORRIGIDO: Usando category_imagem_oculta
+                        await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, imagemOcultaId]); 
                     }
                 }
             }
@@ -232,12 +230,12 @@ router.put('/admin/imagem-oculta/:id', (req, res, next) => {
                 return res.status(404).json({ message: 'Item de Imagem Oculta não encontrado.' });
             }
 
-            await runAsync("DELETE FROM category_imagem_oculta WHERE imagem_oculta_id = ?", [id]); // CORRIGIDO: Usando category_imagem_oculta
+            await runAsync("DELETE FROM category_imagem_oculta WHERE imagem_oculta_id = ?", [id]); 
             if (categoryIds) {
                 const parsedCategoryIds = JSON.parse(categoryIds);
                 if (Array.isArray(parsedCategoryIds) && parsedCategoryIds.length > 0) {
                     for (const categoryId of parsedCategoryIds) {
-                        await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, id]); // CORRIGIDO: Usando category_imagem_oculta
+                        await runAsync("INSERT INTO category_imagem_oculta (category_id, imagem_oculta_id) VALUES (?, ?)", [categoryId, id]); 
                     }
                 }
             }
@@ -275,7 +273,7 @@ router.delete('/admin/imagem-oculta/:id', async (req, res) => {
             }
         }
         
-        await runAsync("DELETE FROM category_imagem_oculta WHERE imagem_oculta_id = ?", [req.params.id]); // CORRIGIDO: Usando category_imagem_oculta
+        await runAsync("DELETE FROM category_imagem_oculta WHERE imagem_oculta_id = ?", [req.params.id]); 
 
         res.json({ message: 'Imagem Oculta excluída com sucesso.' });
     } catch (err) {

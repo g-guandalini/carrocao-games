@@ -1,12 +1,28 @@
 // server/routes/categoryRoutes.js
 const express = require('express');
 const router = express.Router();
-const { runAsync, getAsync, allAsync } = require('../database'); // Ajuste no path para database
+const { runAsync, getAsync, allAsync } = require('../database');
+
+// Middleware para processar os valores booleanos para o banco de dados (0 ou 1)
+const processBooleanFields = (req, res, next) => {
+    // Para POST e PUT, converte os valores de 'start' para 0 ou 1
+    if (req.body.imagem_oculta_start !== undefined) {
+        req.body.imagem_oculta_start = req.body.imagem_oculta_start ? 1 : 0;
+    }
+    if (req.body.conexao_start !== undefined) {
+        req.body.conexao_start = req.body.conexao_start ? 1 : 0;
+    }
+    if (req.body.bug_start !== undefined) {
+        req.body.bug_start = req.body.bug_start ? 1 : 0;
+    }
+    next();
+};
 
 // GET todas as categorias
 router.get('/', async (req, res) => {
     try {
-        const categories = await allAsync("SELECT * FROM categories ORDER BY name ASC");
+        // Selecionando explicitamente as novas colunas
+        const categories = await allAsync("SELECT id, name, imagem_oculta_start, conexao_start, bug_start FROM categories ORDER BY name ASC", []);
         res.json(categories);
     } catch (err) {
         console.error('Erro ao buscar categorias:', err);
@@ -17,7 +33,8 @@ router.get('/', async (req, res) => {
 // GET categoria por ID
 router.get('/:id', async (req, res) => {
     try {
-        const category = await getAsync("SELECT * FROM categories WHERE id = ?", [req.params.id]);
+        // Selecionando explicitamente as novas colunas
+        const category = await getAsync("SELECT id, name, imagem_oculta_start, conexao_start, bug_start FROM categories WHERE id = ?", [req.params.id]);
         if (category) {
             res.json(category);
         } else {
@@ -30,14 +47,17 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST criar nova categoria
-router.post('/', async (req, res) => {
-    const { name } = req.body;
+router.post('/', processBooleanFields, async (req, res) => {
+    const { name, imagem_oculta_start = 0, conexao_start = 0, bug_start = 0 } = req.body; // Definindo defaults para 0
     if (!name) {
         return res.status(400).json({ error: 'O nome da categoria é obrigatório.' });
     }
     try {
-        const result = await runAsync("INSERT INTO categories (name) VALUES (?)", [name]);
-        res.status(201).json({ id: result.lastID, name });
+        const result = await runAsync(
+            "INSERT INTO categories (name, imagem_oculta_start, conexao_start, bug_start) VALUES (?, ?, ?, ?)",
+            [name, imagem_oculta_start, conexao_start, bug_start]
+        );
+        res.status(201).json({ id: result.lastID, name, imagem_oculta_start, conexao_start, bug_start });
     } catch (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
             return res.status(409).json({ error: 'Já existe uma categoria com este nome.' });
@@ -48,16 +68,42 @@ router.post('/', async (req, res) => {
 });
 
 // PUT atualizar categoria
-router.put('/:id', async (req, res) => {
-    const { name } = req.body;
+router.put('/:id', processBooleanFields, async (req, res) => {
+    const { name, imagem_oculta_start, conexao_start, bug_start } = req.body;
     const { id } = req.params;
+
     if (!name) {
         return res.status(400).json({ error: 'O nome da categoria é obrigatório.' });
     }
+
+    // Construção dinâmica da query de UPDATE para incluir apenas campos fornecidos
+    let updateFields = ['name = ?'];
+    let params = [name];
+
+    if (imagem_oculta_start !== undefined) {
+        updateFields.push('imagem_oculta_start = ?');
+        params.push(imagem_oculta_start);
+    }
+    if (conexao_start !== undefined) {
+        updateFields.push('conexao_start = ?');
+        params.push(conexao_start);
+    }
+    if (bug_start !== undefined) {
+        updateFields.push('bug_start = ?');
+        params.push(bug_start);
+    }
+
+    params.push(id); // O ID vai por último
+
     try {
-        const result = await runAsync("UPDATE categories SET name = ? WHERE id = ?", [name, id]);
+        const result = await runAsync(
+            `UPDATE categories SET ${updateFields.join(', ')} WHERE id = ?`,
+            params
+        );
         if (result.changes > 0) {
-            res.json({ message: 'Categoria atualizada com sucesso.' });
+            // Retorna o estado atualizado da categoria
+            const updatedCategory = await getAsync("SELECT id, name, imagem_oculta_start, conexao_start, bug_start FROM categories WHERE id = ?", [id]);
+            res.json({ message: 'Categoria atualizada com sucesso.', ...updatedCategory });
         } else {
             res.status(404).json({ message: 'Categoria não encontrada.' });
         }

@@ -27,10 +27,13 @@ export interface Character {
   order_idx?: number | null;
 }
 
-// NOVA INTERFACE: Para uma Categoria
+// NOVA INTERFACE: Para uma Categoria (JÁ ATUALIZADA NA ETAPA ANTERIOR)
 export interface Category {
   id: number; // ID é number
   name: string;
+  imagem_oculta_start: number; // 0 ou 1
+  conexao_start: number;       // 0 ou 1
+  bug_start: number;           // 0 ou 1
 }
 
 // NOVA INTERFACE: Para um item de Imagem Oculta (para ADMIN, com categorias)
@@ -80,7 +83,7 @@ export interface AdminState {
   selectedConexaoItem: ConexaoAdminItem | null; // NOVO: para edição de conexão
 }
 
-// Estado do jogo para Imagem Oculta
+// Estado do jogo para Imagem Oculta (JÁ ATUALIZADA)
 export interface ImagemOcultaGameState {
   currentRoundCharacter: Character | null;
   revealProgress: number;
@@ -89,11 +92,12 @@ export interface ImagemOcultaGameState {
   characters: Character[];
   isLoadingCharacters: boolean;
   playedCharacterIds: string[];
-  selectedCategoryIds: number[]; 
+  allCategories: Category[];
+  activeImagemOcultaCategoryIds: number[];
 }
 
 // =========================================================
-//            NOVA INTERFACE: ConexaoGameState
+//            NOVA INTERFACE: ConexaoGameState (ATUALIZADA)
 // =========================================================
 // Estado do jogo para Conexão
 export interface ConexaoGameState { 
@@ -104,11 +108,13 @@ export interface ConexaoGameState {
   conexoes: Conexao[]; // Lista de itens de conexão disponíveis
   isLoadingConexoes: boolean; // Estado de carregamento
   playedConexaoIds: string[]; // IDs das conexões já jogadas
-  selectedCategoryIds: number[]; // IDs das categorias selecionadas
+  // selectedCategoryIds: number[]; // Removida, pois a seleção é automática
+  allCategories: Category[]; // Nova propriedade para armazenar todas as categorias
+  activeConexaoCategoryIds: number[]; // Nova propriedade para as categorias ativas na Conexão
   disabledTeams: Set<TeamColor>; // Conjunto de times desabilitados
 }
 // =========================================================
-//            FIM DA NOVA INTERFACE: ConexaoGameState
+//            FIM DA NOVA INTERFACES PARA CONEXAO
 // =========================================================
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';

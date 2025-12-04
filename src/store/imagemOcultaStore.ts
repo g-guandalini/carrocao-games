@@ -1,20 +1,18 @@
 // src/store/imagemOcultaStore.ts
 import { reactive, watch } from 'vue';
-import { ImagemOcultaGameState, TeamColor, Character, GameStatus, Category } from '../types';
-
-import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
+import { ImagemOcultaGameState, TeamColor, Character, GameStatus, Category } from '../types'; 
+import { scoreStore, fetchScores, updateScore } from './scoreStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const LOCAL_STORAGE_PLAYED_CHARS_KEY = 'imagemOcultaGamePlayedChars';
 const LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY = 'imagemOcultaCurrentRoundState';
-const LOCAL_STORAGE_SELECTED_CATEGORIES_KEY = 'imagemOcultaSelectedCategories';
 
 interface SavedRoundState {
   currentRoundCharacterId: string | null;
   revealProgress: number;
   gameStatus: GameStatus;
   activeTeam: TeamColor | null;
-  selectedCategoryIds: number[];
+  activeImagemOcultaCategoryIds: number[]; 
 }
 
 // --- Funções auxiliares para localStorage ---
@@ -37,25 +35,6 @@ function loadPlayedCharacterIds(): string[] {
   }
 }
 
-function saveSelectedCategoryIds(ids: number[]) {
-    try {
-        localStorage.setItem(LOCAL_STORAGE_SELECTED_CATEGORIES_KEY, JSON.stringify(ids));
-    } catch (e) {
-        console.error('Erro ao salvar IDs de categorias selecionadas no localStorage:', e);
-    }
-}
-
-function loadSelectedCategoryIds(): number[] {
-    try {
-        const stored = localStorage.getItem(LOCAL_STORAGE_SELECTED_CATEGORIES_KEY);
-        const ids = stored ? JSON.parse(stored) : [];
-        return ids.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
-    } catch (e) {
-        console.error('Erro ao carregar IDs de categorias selecionadas do localStorage:', e);
-        return [];
-    }
-}
-
 function saveCurrentRoundStateToLocalStorage() {
   if (imagemOcultaStore.currentRoundCharacter &&
       imagemOcultaStore.gameStatus !== 'finished' &&
@@ -65,7 +44,7 @@ function saveCurrentRoundStateToLocalStorage() {
       revealProgress: imagemOcultaStore.revealProgress,
       gameStatus: imagemOcultaStore.gameStatus,
       activeTeam: imagemOcultaStore.activeTeam,
-      selectedCategoryIds: imagemOcultaStore.selectedCategoryIds,
+      activeImagemOcultaCategoryIds: imagemOcultaStore.activeImagemOcultaCategoryIds, 
     };
     try {
       localStorage.setItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY, JSON.stringify(stateToSave));
@@ -81,8 +60,8 @@ function loadCurrentRoundStateFromLocalStorage(): SavedRoundState | null {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY);
     const state = stored ? JSON.parse(stored) : null;
-    if (state && state.selectedCategoryIds) {
-        state.selectedCategoryIds = state.selectedCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    if (state && state.activeImagemOcultaCategoryIds) {
+        state.activeImagemOcultaCategoryIds = state.activeImagemOcultaCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
     }
     return state;
   } catch (e) {
@@ -112,7 +91,8 @@ const initialState: ImagemOcultaGameState = {
   characters: [],
   isLoadingCharacters: false,
   playedCharacterIds: loadPlayedCharacterIds(),
-  selectedCategoryIds: loadSelectedCategoryIds(),
+  allCategories: [], 
+  activeImagemOcultaCategoryIds: [], 
 };
 
 export const imagemOcultaStore = reactive<ImagemOcultaGameState>({ ...initialState });
@@ -121,24 +101,52 @@ let revealInterval: number | null = null;
 const REVEAL_DURATION_MS = 30000;
 const REVEAL_STEP_MS = 100;
 
-// Interface para a resposta da API de Imagem Oculta
 interface ApiImagemOcultaResponse {
   id: number;
   hint: string;
   answer: string;
   imageUrl: string;
   order_idx: number | null;
-  categories: Category[];
+  categories: Category[]; 
 }
 
-export async function fetchImagemOcultaCharacters(categoryIds: number[] = imagemOcultaStore.selectedCategoryIds): Promise<void> {
+async function fetchCategoriesAndDetermineActive(): Promise<void> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/categories`); 
+        if (!response.ok) {
+            throw new Error(`Erro HTTP ao buscar categorias: ${response.status}`);
+        }
+        const allFetchedCategories: Category[] = await response.json();
+        imagemOcultaStore.allCategories = allFetchedCategories;
+
+        let activeIds: number[] = allFetchedCategories
+            .filter(cat => cat.imagem_oculta_start === 1)
+            .map(cat => cat.id);
+
+        if (activeIds.length === 0) {
+            // Se nenhuma categoria estiver marcada, todas são consideradas ativas
+            activeIds = allFetchedCategories.map(cat => cat.id);
+            console.log("[ImagemOcultaStore] Nenhuma categoria marcada para iniciar, usando TODAS as categorias.");
+        } else {
+            console.log("[ImagemOcultaStore] Categorias ativas (imagem_oculta_start=1):", activeIds);
+        }
+        imagemOcultaStore.activeImagemOcultaCategoryIds = activeIds;
+
+    } catch (error) {
+        console.error('[fetchCategoriesAndDetermineActive] Falha ao buscar e determinar categorias ativas:', error);
+        imagemOcultaStore.allCategories = [];
+        imagemOcultaStore.activeImagemOcultaCategoryIds = [];
+    }
+}
+
+export async function fetchImagemOcultaCharacters(): Promise<void> {
   imagemOcultaStore.isLoadingCharacters = true;
   try {
     let url = `${API_BASE_URL}/api/imagem-oculta`;
-    const actualCategoryIds = categoryIds?.filter(id => id != null) || [];
+    const categoryIdsToUse = imagemOcultaStore.activeImagemOcultaCategoryIds;
 
-    if (actualCategoryIds.length > 0) {
-      url += `?categoryIds=${actualCategoryIds.join(',')}`;
+    if (categoryIdsToUse.length > 0) {
+      url += `?categoryIds=${categoryIdsToUse.join(',')}`;
     }
 
     const response = await fetch(url);
@@ -162,13 +170,6 @@ export async function fetchImagemOcultaCharacters(categoryIds: number[] = imagem
   } finally {
     imagemOcultaStore.isLoadingCharacters = false;
   }
-}
-
-export function setSelectedImagemOcultaCategories(ids: number[]) {
-    imagemOcultaStore.selectedCategoryIds = ids;
-    saveSelectedCategoryIds(ids);
-    imagemOcultaStore.playedCharacterIds = [];
-    savePlayedCharacterIds([]);
 }
 
 function pickNextImagemOcultaCharacterId(): string | null {
@@ -205,10 +206,12 @@ async function startNewCleanImagemOcultaRound() {
   Object.assign(imagemOcultaStore, initialRoundStateDefaults());
   clearCurrentRoundStateFromLocalStorage();
 
-  await fetchImagemOcultaCharacters();
+  await fetchCategoriesAndDetermineActive(); 
+  await fetchImagemOcultaCharacters(); 
 
   if (imagemOcultaStore.characters.length === 0) {
     imagemOcultaStore.gameStatus = 'idle';
+    console.warn('[ImagemOcultaStore] Não há personagens disponíveis para iniciar o jogo.');
     return;
   }
 
@@ -230,7 +233,7 @@ async function startNewCleanImagemOcultaRound() {
 }
 
 export async function initializeImagemOcultaGame() {
-  await fetchImagemOcultaCharacters();
+  await fetchCategoriesAndDetermineActive(); 
 
   if (!scoreStore.isLoadingScores) {
     await fetchScores();
@@ -239,28 +242,33 @@ export async function initializeImagemOcultaGame() {
   const savedRoundState = loadCurrentRoundStateFromLocalStorage();
 
   const areCategoriesTheSame = savedRoundState &&
-                               savedRoundState.selectedCategoryIds.length === imagemOcultaStore.selectedCategoryIds.length &&
-                               savedRoundState.selectedCategoryIds.every((id, index) => id === imagemOcultaStore.selectedCategoryIds[index]);
+                               savedRoundState.activeImagemOcultaCategoryIds.length === imagemOcultaStore.activeImagemOcultaCategoryIds.length &&
+                               savedRoundState.activeImagemOcultaCategoryIds.every((id, index) => id === imagemOcultaStore.activeImagemOcultaCategoryIds[index]);
 
   if (savedRoundState && savedRoundState.currentRoundCharacterId &&
       savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle' &&
       areCategoriesTheSame
       ) {
+    await fetchImagemOcultaCharacters(); 
     const prevChar = imagemOcultaStore.characters.find(char => char.id === savedRoundState.currentRoundCharacterId);
     if (prevChar) {
       imagemOcultaStore.currentRoundCharacter = prevChar;
       imagemOcultaStore.revealProgress = savedRoundState.revealProgress;
       imagemOcultaStore.gameStatus = savedRoundState.gameStatus;
       imagemOcultaStore.activeTeam = savedRoundState.activeTeam;
+      imagemOcultaStore.activeImagemOcultaCategoryIds = savedRoundState.activeImagemOcultaCategoryIds;
+
 
       if (imagemOcultaStore.gameStatus === 'revealing') {
         proceedToRevealImagemOculta();
       }
     } else {
+      console.warn('[ImagemOcultaStore] Personagem salvo não encontrado ou categorias mudaram, iniciando nova rodada.');
       clearCurrentRoundStateFromLocalStorage();
       await startNewCleanImagemOcultaRound();
     }
   } else {
+    console.log('[ImagemOcultaStore] Nenhuma rodada salva válida ou categorias diferentes, iniciando nova rodada.');
     await startNewCleanImagemOcultaRound();
   }
 }
@@ -341,10 +349,10 @@ export function viewImagemOcultaScoreboard() {
 
 export async function resetImagemOcultaGameScores() {
     stopImagemOcultaReveal();
-    // NÃO CHAME resetScores() AQUI. Ele deve ser chamado globalmente pelo SplashScreen se necessário.
     Object.assign(imagemOcultaStore, initialRoundStateDefaults());
     imagemOcultaStore.playedCharacterIds = [];
     savePlayedCharacterIds([]);
+    imagemOcultaStore.activeImagemOcultaCategoryIds = []; 
     clearCurrentRoundStateFromLocalStorage();
     imagemOcultaStore.gameStatus = 'idle';
 }

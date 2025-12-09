@@ -13,7 +13,10 @@ let db;
 function runAsync(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
-            if (err) reject(err);
+            if (err) {
+                console.error(`[DB Error] runAsync: ${sql}`, err); // Added error logging
+                reject(err);
+            }
             else resolve(this); // 'this' contém lastID e changes
         });
     });
@@ -22,7 +25,10 @@ function runAsync(sql, params = []) {
 function getAsync(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row) => {
-            if (err) reject(err);
+            if (err) {
+                console.error(`[DB Error] getAsync: ${sql}`, err); // Added error logging
+                reject(err);
+            }
             else resolve(row);
         });
     });
@@ -31,7 +37,10 @@ function getAsync(sql, params = []) {
 function allAsync(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
+            if (err) {
+                console.error(`[DB Error] allAsync: ${sql}`, err); // Added error logging
+                reject(err);
+            }
             else resolve(rows);
         });
     });
@@ -72,6 +81,28 @@ async function createTables() {
         `);
         console.log('Tabela "categories" criada ou já existe.');
 
+        // --- Lógica de Migração para novas colunas na tabela 'categories' ---
+        let categoryTableInfo = await allAsync("PRAGMA table_info(categories)");
+        const categoryColumnNames = categoryTableInfo.map(col => col.name);
+
+        if (!categoryColumnNames.includes('imagem_oculta_start')) {
+            console.log('Coluna "imagem_oculta_start" não encontrada na tabela "categories". Adicionando...');
+            await runAsync("ALTER TABLE categories ADD COLUMN imagem_oculta_start INTEGER DEFAULT 0");
+            console.log('Coluna "imagem_oculta_start" adicionada com sucesso.');
+        }
+        if (!categoryColumnNames.includes('conexao_start')) {
+            console.log('Coluna "conexao_start" não encontrada na tabela "categories". Adicionando...');
+            await runAsync("ALTER TABLE categories ADD COLUMN conexao_start INTEGER DEFAULT 0");
+            console.log('Coluna "conexao_start" adicionada com sucesso.');
+        }
+        if (!categoryColumnNames.includes('bug_start')) {
+            console.log('Coluna "bug_start" não encontrada na tabela "categories". Adicionando...');
+            await runAsync("ALTER TABLE categories ADD COLUMN bug_start INTEGER DEFAULT 0");
+            console.log('Coluna "bug_start" adicionada com sucesso.');
+        }
+        // --- Fim da Lógica de Migração para 'categories' ---
+
+
         // Tabela Imagem Oculta
         await runAsync(`
             CREATE TABLE IF NOT EXISTS imagem_oculta (
@@ -85,10 +116,10 @@ async function createTables() {
         console.log('Tabela "imagem_oculta" criada ou já existe.');
 
         // Lógica de Migração: Verifica e adiciona a coluna order_idx se ela não existir para imagem_oculta
-        let tableInfo = await allAsync("PRAGMA table_info(imagem_oculta)");
-        let hasOrderColumn = tableInfo.some(col => col.name === 'order_idx');
+        let imagemOcultaTableInfo = await allAsync("PRAGMA table_info(imagem_oculta)");
+        let hasOrderColumnImagemOculta = imagemOcultaTableInfo.some(col => col.name === 'order_idx');
 
-        if (!hasOrderColumn) {
+        if (!hasOrderColumnImagemOculta) {
             console.log('Coluna "order_idx" não encontrada na tabela "imagem_oculta". Adicionando...');
             await runAsync("ALTER TABLE imagem_oculta ADD COLUMN order_idx INTEGER DEFAULT NULL");
             console.log('Coluna "order_idx" adicionada com sucesso.');
@@ -132,10 +163,10 @@ async function createTables() {
         console.log('Tabela "conexao" criada ou já existe.');
 
         // Lógica de Migração: Verifica e adiciona a coluna order_idx se ela não existir para conexao
-        tableInfo = await allAsync("PRAGMA table_info(conexao)");
-        hasOrderColumn = tableInfo.some(col => col.name === 'order_idx');
+        let conexaoTableInfo = await allAsync("PRAGMA table_info(conexao)");
+        let hasOrderColumnConexao = conexaoTableInfo.some(col => col.name === 'order_idx');
 
-        if (!hasOrderColumn) {
+        if (!hasOrderColumnConexao) {
             console.log('Coluna "order_idx" não encontrada na tabela "conexao". Adicionando...');
             await runAsync("ALTER TABLE conexao ADD COLUMN order_idx INTEGER DEFAULT NULL");
             console.log('Coluna "order_idx" adicionada com sucesso à tabela "conexao".');
@@ -174,6 +205,7 @@ async function seedInitialData() {
     if (categoryCountRow.count === 0) {
         console.log('Populando "categories" com dados iniciais...');
         for (const catName of initialCategories) {
+            // New columns will automatically get their DEFAULT 0 value as specified in ALTER TABLE
             await runAsync("INSERT INTO categories (name) VALUES (?)", [catName]);
         }
         console.log('Dados iniciais de categories inseridos com sucesso.');
@@ -184,7 +216,7 @@ async function seedInitialData() {
     // Personagens iniciais
     const ALL_CHARACTERS = [
         { name: 'Mickey Mouse', imageUrl: '/characters/mickey.png', hint: 'Um famoso rato falante de desenhos animados.', categoryNames: ['Personagens', 'Animais'], order: 1 },
-        { name: 'Homem Aranha', imageUrl: '/characters/homem_arananha.png', hint: 'Um herói que escala paredes e solta teias.', categoryNames: ['Personagens'], order: 2 },
+        { name: 'Homem Aranha', imageUrl: '/characters/homem_aranha.png', hint: 'Um herói que escala paredes e solta teias.', categoryNames: ['Personagens'], order: 2 },
         { name: 'Pikachu', imageUrl: '/characters/pikachu.png', hint: 'Um monstrinho amarelo que libera choques elétricos.', categoryNames: ['Personagens', 'Animais'], order: 3 },
         { name: 'Goku', imageUrl: '/characters/goku.png', hint: 'Um guerreiro alienígena com cabelo espetado que adora lutar.', categoryNames: ['Personagens'], order: 4 },
         { name: 'Homem de Ferro', imageUrl: '/characters/homem_ferro.png', hint: 'Um bilionário que usa uma armadura de alta tecnologia.', categoryNames: ['Personagens', 'Objetos'], order: 5 },

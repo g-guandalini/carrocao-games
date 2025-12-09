@@ -6,7 +6,7 @@ import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreSto
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const LOCAL_STORAGE_PLAYED_CONEXOES_KEY = 'conexaoGamePlayedConexoes';
 const LOCAL_STORAGE_CURRENT_CONEXAO_ROUND_STATE_KEY = 'conexaoCurrentRoundState';
-const LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY = 'conexaoSelectedCategories';
+// LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY removido, pois a seleção é automática
 
 interface SavedConexaoRoundState {
   currentRoundConexaoId: string | null;
@@ -14,7 +14,8 @@ interface SavedConexaoRoundState {
   revealedLettersIndices: number[];
   gameStatus: GameStatus;
   activeTeam: TeamColor | null;
-  selectedCategoryIds: number[];
+  // selectedCategoryIds: number[]; // Removido
+  activeConexaoCategoryIds: number[]; // Adicionado
   disabledTeams: TeamColor[];
 }
 
@@ -38,34 +39,37 @@ function loadPlayedConexaoIds(): string[] {
   }
 }
 
-function saveSelectedConexaoCategoryIds(ids: number[]) {
-    try {
-        localStorage.setItem(LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY, JSON.stringify(ids));
-    } catch (e) {
-        console.error('Erro ao salvar IDs de categorias selecionadas para Conexão no localStorage:', e);
-    }
-}
+// saveSelectedConexaoCategoryIds e loadSelectedConexaoCategoryIds removidas/não mais usadas
+// function saveSelectedConexaoCategoryIds(ids: number[]) {
+//     try {
+//         localStorage.setItem(LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY, JSON.stringify(ids));
+//     } catch (e) {
+//         console.error('Erro ao salvar IDs de categorias selecionadas para Conexão no localStorage:', e);
+//     }
+// }
 
-function loadSelectedConexaoCategoryIds(): number[] {
-    try {
-        const stored = localStorage.getItem(LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY);
-        const ids = stored ? JSON.parse(stored) : [];
-        return ids.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
-    } catch (e) {
-        console.error('Erro ao carregar IDs de categorias selecionadas para Conexão do localStorage:', e);
-        return [];
-    }
-}
+// function loadSelectedConexaoCategoryIds(): number[] {
+//     try {
+//         const stored = localStorage.getItem(LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY);
+//         const ids = stored ? JSON.parse(stored) : [];
+//         return ids.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+//     } catch (e) {
+//         console.error('Erro ao carregar IDs de categorias selecionadas para Conexão do localStorage:', e);
+//         return [];
+//     }
+// }
 
 function saveCurrentConexaoRoundStateToLocalStorage() {
-  if (conexaoStore.currentRoundConexao) {
+  if (conexaoStore.currentRoundConexao &&
+      conexaoStore.gameStatus !== 'finished' &&
+      conexaoStore.gameStatus !== 'idle') { // Adicionado check para não salvar idle/finished
     const stateToSave: SavedConexaoRoundState = {
       currentRoundConexaoId: conexaoStore.currentRoundConexao.id,
       revealedLettersCount: conexaoStore.revealedLettersCount,
       revealedLettersIndices: Array.from(conexaoStore.currentRoundConexao.revealedLetters || new Set()),
       gameStatus: conexaoStore.gameStatus,
       activeTeam: conexaoStore.activeTeam,
-      selectedCategoryIds: conexaoStore.selectedCategoryIds,
+      activeConexaoCategoryIds: conexaoStore.activeConexaoCategoryIds, // Usando a nova propriedade
       disabledTeams: Array.from(conexaoStore.disabledTeams),
     };
     try {
@@ -73,6 +77,8 @@ function saveCurrentConexaoRoundStateToLocalStorage() {
     } catch (e) {
       console.error('Erro ao salvar estado da rodada atual de Conexão no localStorage:', e);
     }
+  } else {
+    clearCurrentConexaoRoundStateFromLocalStorage(); // Limpa se o jogo não está ativo
   }
 }
 
@@ -80,8 +86,9 @@ function loadCurrentConexaoRoundStateFromLocalStorage(): SavedConexaoRoundState 
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_CURRENT_CONEXAO_ROUND_STATE_KEY);
     const state = stored ? JSON.parse(stored) : null;
-    if (state && state.selectedCategoryIds) {
-        state.selectedCategoryIds = state.selectedCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+    // Adaptar para a nova propriedade 'activeConexaoCategoryIds'
+    if (state && state.activeConexaoCategoryIds) {
+        state.activeConexaoCategoryIds = state.activeConexaoCategoryIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
     }
     if (state && !state.disabledTeams) {
         state.disabledTeams = [];
@@ -115,7 +122,9 @@ const initialState: ConexaoGameState = {
   conexoes: [],
   isLoadingConexoes: false,
   playedConexaoIds: loadPlayedConexaoIds(),
-  selectedCategoryIds: loadSelectedConexaoCategoryIds(),
+  // selectedCategoryIds removido
+  allCategories: [], // Adicionado
+  activeConexaoCategoryIds: [], // Adicionado
 };
 
 export const conexaoStore = reactive<ConexaoGameState>({ ...initialState });
@@ -145,14 +154,46 @@ interface ApiConexaoResponse {
   categories: Category[];
 }
 
-export async function fetchConexoes(categoryIds: number[] = conexaoStore.selectedCategoryIds): Promise<void> {
+// NOVA FUNÇÃO: fetchCategoriesAndDetermineActiveConexao
+async function fetchCategoriesAndDetermineActiveConexao(): Promise<void> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/categories`); 
+        if (!response.ok) {
+            throw new Error(`Erro HTTP ao buscar categorias: ${response.status}`);
+        }
+        const allFetchedCategories: Category[] = await response.json();
+        conexaoStore.allCategories = allFetchedCategories; // Armazena todas as categorias
+
+        let activeIds: number[] = allFetchedCategories
+            .filter(cat => cat.conexao_start === 1) // Filtra por conexao_start
+            .map(cat => cat.id);
+
+        if (activeIds.length === 0) {
+            // Se nenhuma categoria estiver marcada, todas são consideradas ativas
+            activeIds = allFetchedCategories.map(cat => cat.id);
+            console.log("[ConexaoStore] Nenhuma categoria marcada para iniciar, usando TODAS as categorias.");
+        } else {
+            console.log("[ConexaoStore] Categorias ativas (conexao_start=1):", activeIds);
+        }
+        conexaoStore.activeConexaoCategoryIds = activeIds; // Atualiza a store com IDs ativos
+
+    } catch (error) {
+        console.error('[fetchCategoriesAndDetermineActiveConexao] Falha ao buscar e determinar categorias ativas:', error);
+        conexaoStore.allCategories = [];
+        conexaoStore.activeConexaoCategoryIds = [];
+    }
+}
+
+// fetchConexoes agora usa activeConexaoCategoryIds
+export async function fetchConexoes(): Promise<void> { // Removido 'categoryIds' do parâmetro
     conexaoStore.isLoadingConexoes = true;
     try {
       let url = `${API_BASE_URL}/api/conexao`;
-      const actualCategoryIds = categoryIds?.filter(id => id != null) || [];
+      // Usa a nova propriedade da store
+      const categoryIdsToUse = conexaoStore.activeConexaoCategoryIds;
 
-      if (actualCategoryIds.length > 0) {
-        url += `?categoryIds=${actualCategoryIds.join(',')}`;
+      if (categoryIdsToUse.length > 0) {
+        url += `?categoryIds=${categoryIdsToUse.join(',')}`;
       }
 
       const response = await fetch(url);
@@ -178,12 +219,13 @@ export async function fetchConexoes(categoryIds: number[] = conexaoStore.selecte
     }
   }
 
-export function setSelectedConexaoCategories(ids: number[]) {
-    conexaoStore.selectedCategoryIds = ids;
-    saveSelectedConexaoCategoryIds(ids);
-    conexaoStore.playedConexaoIds = [];
-    savePlayedConexaoIds([]);
-}
+// setSelectedConexaoCategories removido/não mais usado
+// export function setSelectedConexaoCategories(ids: number[]) {
+//     conexaoStore.selectedCategoryIds = ids;
+//     saveSelectedConexaoCategoryIds(ids);
+//     conexaoStore.playedConexaoIds = [];
+//     savePlayedConexaoIds([]);
+// }
 
 function pickNextConexaoId(): string | null {
   let availableConexoes = conexaoStore.conexoes.filter(
@@ -222,11 +264,13 @@ async function startNewCleanConexaoRound() {
   Object.assign(conexaoStore, initialConexaoRoundStateDefaults());
   clearCurrentConexaoRoundStateFromLocalStorage();
 
-  await fetchConexoes();
+  await fetchCategoriesAndDetermineActiveConexao(); // NOVO: Busca e determina categorias ativas
+  await fetchConexoes(); // Chama fetchConexoes sem parâmetros, pois agora usa a store
 
   if (conexaoStore.conexoes.length === 0) {
     
     conexaoStore.gameStatus = 'idle';
+    console.warn('[ConexaoStore] Não há conexões disponíveis para iniciar o jogo.'); // Adicionado log
     return;
   }
 
@@ -251,7 +295,7 @@ async function startNewCleanConexaoRound() {
 }
 
 export async function initializeConexaoGame() {
-  await fetchConexoes();
+  await fetchCategoriesAndDetermineActiveConexao(); // NOVO: Busca e determina categorias ativas
 
   if (!scoreStore.isLoadingScores) {
     await fetchScores();
@@ -259,11 +303,16 @@ export async function initializeConexaoGame() {
 
   const savedRoundState = loadCurrentConexaoRoundStateFromLocalStorage();
 
+  // NOVO: A lógica de verificação de categorias agora usa activeConexaoCategoryIds
   const areCategoriesTheSame = savedRoundState &&
-                               savedRoundState.selectedCategoryIds.length === conexaoStore.selectedCategoryIds.length &&
-                               savedRoundState.selectedCategoryIds.every((id, index) => id === conexaoStore.selectedCategoryIds[index]);
+                               savedRoundState.activeConexaoCategoryIds.length === conexaoStore.activeConexaoCategoryIds.length &&
+                               savedRoundState.activeConexaoCategoryIds.every((id, index) => id === conexaoStore.activeConexaoCategoryIds[index]);
 
-  if (savedRoundState && savedRoundState.currentRoundConexaoId && areCategoriesTheSame) {
+  if (savedRoundState && savedRoundState.currentRoundConexaoId &&
+      savedRoundState.gameStatus !== 'finished' && savedRoundState.gameStatus !== 'idle' && // Adicionado check para não carregar idle/finished
+      areCategoriesTheSame
+      ) {
+    await fetchConexoes(); // Chama fetchConexoes sem parâmetros
     const prevConexao = conexaoStore.conexoes.find(con => con.id === savedRoundState.currentRoundConexaoId);
     if (prevConexao) {
       conexaoStore.currentRoundConexao = { ...prevConexao, revealedLetters: new Set(savedRoundState.revealedLettersIndices || []) };
@@ -271,15 +320,19 @@ export async function initializeConexaoGame() {
       conexaoStore.gameStatus = savedRoundState.gameStatus;
       conexaoStore.activeTeam = savedRoundState.activeTeam;
       conexaoStore.disabledTeams = new Set(savedRoundState.disabledTeams || []);
+      conexaoStore.activeConexaoCategoryIds = savedRoundState.activeConexaoCategoryIds; // Restaura as categorias ativas salvas
+
 
       if (conexaoStore.gameStatus === 'revealing') {
         startImageAndLetterRevelation(false);
       }
     } else {
+      console.warn('[ConexaoStore] Conexão salva não encontrada ou categorias mudaram, iniciando nova rodada.'); // Adicionado log
       clearCurrentConexaoRoundStateFromLocalStorage();
       await startNewCleanConexaoRound();
     }
   } else {
+    console.log('[ConexaoStore] Nenhuma rodada salva válida ou categorias diferentes, iniciando nova rodada.'); // Adicionado log
     await startNewCleanConexaoRound();
   }
 }
@@ -436,6 +489,8 @@ export async function resetConexaoGameScores() {
     Object.assign(conexaoStore, initialConexaoRoundStateDefaults());
     conexaoStore.playedConexaoIds = [];
     savePlayedConexaoIds([]);
+    conexaoStore.allCategories = []; // Reseta
+    conexaoStore.activeConexaoCategoryIds = []; // Reseta
     clearCurrentConexaoRoundStateFromLocalStorage();
     conexaoStore.gameStatus = 'idle';
 }
@@ -454,7 +509,8 @@ watch(() => conexaoStore.activeTeam, (newVal, oldVal) => {
 });
 
 watch(() => conexaoStore.currentRoundConexao, (newVal, oldVal) => {
-    if (newVal !== oldVal) {
+    // Apenas salva se o ID da conexão mudou ou se o conjunto de letras reveladas mudou
+    if (newVal?.id !== oldVal?.id || (newVal?.revealedLetters && oldVal?.revealedLetters && newVal.revealedLetters.size !== oldVal.revealedLetters.size)) {
         saveCurrentConexaoRoundStateToLocalStorage();
     }
 }, { deep: true });
@@ -465,4 +521,13 @@ watch(() => conexaoStore.disabledTeams, (newVal, oldVal) => {
   if (!areEqual) {
     saveCurrentConexaoRoundStateToLocalStorage();
   }
+}, { deep: true });
+
+// NOVO WATCHER: Para activeConexaoCategoryIds
+watch(() => conexaoStore.activeConexaoCategoryIds, (newVal, oldVal) => {
+    // Compara se os arrays são diferentes (IDs ou ordem)
+    const arraysAreDifferent = newVal.length !== oldVal.length || !newVal.every((value, index) => value === oldVal[index]);
+    if (arraysAreDifferent) {
+        saveCurrentConexaoRoundStateToLocalStorage();
+    }
 }, { deep: true });

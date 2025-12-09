@@ -13,7 +13,7 @@
 import { defineComponent, computed, onMounted, onUnmounted } from 'vue';
 import { scoreStore, resetScores } from '../store/scoreStore';
 import { resetImagemOcultaGameScores } from '../store/imagemOcultaStore'; 
-import { resetConexaoGameScores } from '../store/conexaoStore';
+import { resetConexaoGameScores } from '../store/conexaoStore'; // Importado resetConexaoGameScores
 import { useRouter } from 'vue-router'; 
 
 // Interface para as partículas dos fogos de artifício
@@ -49,16 +49,17 @@ export default defineComponent({
       }
     };
 
-    const navigateToCategorySelection = async (gameType: 'imagem-oculta' | 'conexao') => {
-      console.log(`[SplashScreen] Clicou em ${gameType === 'imagem-oculta' ? 'Imagem Oculta' : 'Conexão'}. Navegando para seleção de categorias.`);
+    // navigateToGame alterado para rotear Conexão diretamente
+    const navigateToGame = async (gameType: 'imagem-oculta' | 'conexao') => {
+      console.log(`[SplashScreen] Clicou em ${gameType === 'imagem-oculta' ? 'Imagem Oculta' : 'Conexão'}. Iniciando jogo.`);
       
       if (gameType === 'imagem-oculta') {
         await resetImagemOcultaGameScores(); 
+        router.push({ name: 'ImagemOcultaGame' }); // Navega diretamente para o jogo Imagem Oculta
       } else if (gameType === 'conexao') {
-        await resetConexaoGameScores(); 
+        await resetConexaoGameScores(); // Reseta os scores do jogo de Conexão
+        router.push({ name: 'ConexaoGame' }); // Navega diretamente para o jogo Conexão
       }
-
-      router.push({ name: 'CategorySelection', query: { game: gameType } }); 
     };
 
     const navigateToAdmin = () => {
@@ -82,8 +83,8 @@ export default defineComponent({
     // NOVO: Mapeamento de teclas para ações (incluindo 'A' para Admin)
     const ACTION_KEYS: { [key: string]: () => void } = {
       'A': () => navigateToAdmin(), // Mapeia 'A' para a função de admin
-      'C': () => navigateToCategorySelection('conexao'),
-      'I': () => navigateToCategorySelection('imagem-oculta'),
+      'C': () => navigateToGame('conexao'), // Mapeia 'C' para Conexão (agora vai direto)
+      'I': () => navigateToGame('imagem-oculta'), // Mapeia 'I' para Imagem Oculta
       'B': () => {
         console.log("Bug action triggered via key 'B'. Emitting 'select-bug'.");
         emit('select-bug');
@@ -242,7 +243,7 @@ export default defineComponent({
       // Essas funções são mantidas no return caso sejam chamadas de outros lugares (ex: mapeamento de teclas)
       hasScoresToClear,
       clearAllScores,
-      navigateToCategorySelection, 
+      navigateToGame, // Alterado para navigateToGame
       navigateToAdmin,
     };
   },

@@ -7,18 +7,12 @@ import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import CategoryManagement from '../views/admin/CategoryManagement.vue';
 import ImagemOcultaManagement from '../views/admin/ImagemOcultaManagement.vue';
 import ConexaoManagement from '../views/admin/ConexaoManagement.vue'; 
-import CategorySelectionScreen from '../components/CategorySelectionScreen.vue'; 
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     name: 'Home',
     component: SplashScreen,
-  },
-  {
-    path: '/category-selection', 
-    name: 'CategorySelection',
-    component: CategorySelectionScreen,
   },
   {
     path: '/imagem-oculta',

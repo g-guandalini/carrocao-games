@@ -11,29 +11,84 @@
       <h3>{{ editingCategory.id ? 'Editar Categoria' : 'Adicionar Nova Categoria' }}</h3>
       <form @submit.prevent="saveCategory">
         <input type="text" v-model="editingCategory.name" placeholder="Nome da Categoria" required />
+        
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" v-model="editingCategory.imagem_oculta_start" />
+            Selecionar para o jogo Imagem Oculta
+          </label>
+          <label>
+            <input type="checkbox" v-model="editingCategory.conexao_start" />
+            Selecionar para o jogo Conexão
+          </label>
+          <label>
+            <input type="checkbox" v-model="editingCategory.bug_start" />
+            Selecionar para o jogo Bug
+          </label>
+        </div>
+
         <button type="submit">{{ editingCategory.id ? 'Salvar Edição' : 'Adicionar' }}</button>
-        <!-- O botão cancelar agora aparece sempre que o formulário está aberto, para poder fechar -->
         <button type="button" @click="cancelEdit" class="btn-cancel">Cancelar</button> 
       </form>
     </div>
 
     <!-- Lista de Categorias em Tabela -->
     <div class="category-list">
+      <!-- Campo de Busca -->
+      <div class="search-container">
+        <input type="text" v-model="searchTerm" placeholder="Buscar por nome..." class="search-input" />
+      </div>
+
       <table class="data-table">
         <thead>
           <tr>
-            <th scope="col">ID</th>
-            <th scope="col">Nome</th>
+            <th 
+                scope="col" 
+                @click="sortTable('id')" 
+                :class="{ 'sortable': true, 'sorted-asc': sortColumn === 'id' && sortDirection === 'asc', 'sorted-desc': sortColumn === 'id' && sortDirection === 'desc' }"
+            >
+                ID
+                <span v-if="sortColumn === 'id'" class="sort-indicator">
+                    <span v-if="sortDirection === 'asc'">&#9650;</span>
+                    <span v-else>&#9660;</span>
+                </span>
+            </th>
+            <th 
+                scope="col" 
+                @click="sortTable('name')" 
+                :class="{ 'sortable': true, 'sorted-asc': sortColumn === 'name' && sortDirection === 'asc', 'sorted-desc': sortColumn === 'name' && sortDirection === 'desc' }"
+            >
+                Nome
+                <span v-if="sortColumn === 'name'" class="sort-indicator">
+                    <span v-if="sortDirection === 'asc'">&#9650;</span>
+                    <span v-else>&#9660;</span>
+                </span>
+            </th>
+            <th scope="col">Imagem Oculta</th>
+            <th scope="col">Conexão</th>
+            <th scope="col">Bug</th>
             <th scope="col">Ações</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="categories.length === 0">
-            <td colspan="3" style="text-align: center;">Nenhuma categoria cadastrada.</td>
+          <tr v-if="sortedCategories.length === 0">
+            <td colspan="6" style="text-align: center;">Nenhuma categoria encontrada.</td>
           </tr>
-          <tr v-for="category in categories" :key="category.id">
+          <tr v-for="category in sortedCategories" :key="category.id">
             <td>{{ category.id }}</td>
             <td>{{ category.name }}</td>
+            <td>
+              <span v-if="category.imagem_oculta_start" class="status-icon success">&#10003;</span>
+              <span v-else class="status-icon error">&#10006;</span>
+            </td>
+            <td>
+              <span v-if="category.conexao_start" class="status-icon success">&#10003;</span>
+              <span v-else class="status-icon error">&#10006;</span>
+            </td>
+            <td>
+              <span v-if="category.bug_start" class="status-icon success">&#10003;</span>
+              <span v-else class="status-icon error">&#10006;</span>
+            </td>
             <td>
               <button @click="editCategory(category)" class="btn-icon btn-edit">
                 <!-- Ícone de caneta SVG -->
@@ -58,27 +113,44 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
+import { defineComponent, ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 
-interface Category {
-  id: number;
-  name: string;
-}
+// Usando a interface Category do types.ts para consistência
+import { Category } from '../../types'; 
 
 export default defineComponent({
   name: 'CategoryManagement',
   setup() {
     const categories = ref<Category[]>([]);
-    const editingCategory = ref<Category>({ id: 0, name: '' }); // Usado para adicionar e editar
-    const showForm = ref(false); // NOVO: Estado para controlar a visibilidade do formulário
+    const editingCategory = ref<Category>({ 
+      id: 0, 
+      name: '', 
+      // Garante que os defaults são booleanos para o v-model do checkbox
+      imagem_oculta_start: false, 
+      conexao_start: false,       
+      bug_start: false            
+    }); 
+    const showForm = ref(false);
 
-    const API_URL = import.meta.env.VITE_API_BASE_URL + '/api/admin/categories'; // Ajuste a porta se necessário
+    // --- Adição para Busca e Ordenação ---
+    const searchTerm = ref<string>(''); 
+    const sortColumn = ref<string>(''); 
+    const sortDirection = ref<'asc' | 'desc'>('asc'); 
+    // --- Fim Adição ---
+
+    const API_URL = import.meta.env.VITE_API_BASE_URL + '/api/admin/categories';
 
     const fetchCategories = async () => {
       try {
         const response = await axios.get<Category[]>(API_URL);
-        categories.value = response.data;
+        // Mapeia os valores 0/1 do backend para booleanos no frontend
+        categories.value = response.data.map(cat => ({
+          ...cat,
+          imagem_oculta_start: Boolean(cat.imagem_oculta_start),
+          conexao_start: Boolean(cat.conexao_start),
+          bug_start: Boolean(cat.bug_start),
+        }));
       } catch (error) {
         console.error('Erro ao buscar categorias:', error);
         alert('Erro ao carregar categorias.');
@@ -92,18 +164,27 @@ export default defineComponent({
       }
 
       try {
+        // Envia os booleanos diretamente; categoryRoutes.js no backend converterá para 0/1
         if (editingCategory.value.id) {
-          // Atualizar categoria existente
-          await axios.put(`${API_URL}/${editingCategory.value.id}`, { name: editingCategory.value.name });
+          await axios.put(`${API_URL}/${editingCategory.value.id}`, { 
+            name: editingCategory.value.name,
+            imagem_oculta_start: editingCategory.value.imagem_oculta_start,
+            conexao_start: editingCategory.value.conexao_start,
+            bug_start: editingCategory.value.bug_start,
+          });
           alert('Categoria atualizada com sucesso!');
         } else {
-          // Adicionar nova categoria
-          await axios.post(API_URL, { name: editingCategory.value.name });
+          await axios.post(API_URL, { 
+            name: editingCategory.value.name,
+            imagem_oculta_start: editingCategory.value.imagem_oculta_start,
+            conexao_start: editingCategory.value.conexao_start,
+            bug_start: editingCategory.value.bug_start,
+          });
           alert('Categoria adicionada com sucesso!');
         }
-        resetForm(); // Limpa o formulário
-        fetchCategories(); // Recarrega a lista
-        showForm.value = false; // NOVO: Esconde o formulário após salvar
+        resetForm();
+        fetchCategories();
+        showForm.value = false;
       } catch (error: any) {
         console.error('Erro ao salvar categoria:', error);
         if (error.response && error.response.data && error.response.data.error) {
@@ -114,25 +195,35 @@ export default defineComponent({
       }
     };
 
-    // NOVO: Função para exibir o formulário de adição
     const showAddForm = () => {
-      resetForm(); // Limpa o formulário antes de mostrar para adicionar
+      resetForm();
       showForm.value = true;
     };
 
     const editCategory = (category: Category) => {
-      editingCategory.value = { ...category }; // Copia a categoria para edição
-      showForm.value = true; // NOVO: Exibe o formulário ao clicar em editar
+      // Copia a categoria, garantindo que os valores são booleanos para o v-model do checkbox
+      editingCategory.value = { 
+        ...category,
+        imagem_oculta_start: Boolean(category.imagem_oculta_start),
+        conexao_start: Boolean(category.conexao_start),
+        bug_start: Boolean(category.bug_start),
+      }; 
+      showForm.value = true;
     };
 
     const cancelEdit = () => {
-      resetForm(); // Limpa o formulário
-      showForm.value = false; // NOVO: Esconde o formulário ao cancelar
+      resetForm();
+      showForm.value = false;
     };
     
-    // NOVO: Função para resetar o formulário, extraída de saveCategory e cancelEdit
     const resetForm = () => {
-        editingCategory.value = { id: 0, name: '' };
+        editingCategory.value = { 
+            id: 0, 
+            name: '', 
+            imagem_oculta_start: false, 
+            conexao_start: false, 
+            bug_start: false 
+        };
     }
 
     const deleteCategory = async (id: number) => {
@@ -140,7 +231,7 @@ export default defineComponent({
         try {
           await axios.delete(`${API_URL}/${id}`);
           alert('Categoria excluída com sucesso!');
-          fetchCategories(); // Recarrega a lista
+          fetchCategories();
         } catch (error) {
           console.error('Erro ao excluir categoria:', error);
           alert('Erro ao excluir categoria.');
@@ -148,19 +239,81 @@ export default defineComponent({
       }
     };
 
+    // --- Lógica de Busca e Ordenação ---
+    const filteredCategories = computed(() => {
+      if (!searchTerm.value) {
+        return categories.value;
+      }
+      const lowerCaseSearchTerm = searchTerm.value.toLowerCase();
+      return categories.value.filter(category => {
+        return (
+          category.name.toLowerCase().includes(lowerCaseSearchTerm)
+        );
+      });
+    });
+
+    const sortTable = (column: string) => {
+        if (sortColumn.value === column) {
+            sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn.value = column;
+            sortDirection.value = 'asc';
+        }
+    };
+
+    const sortedCategories = computed(() => {
+        const items = [...filteredCategories.value]; 
+
+        if (!sortColumn.value) {
+            return items; 
+        }
+
+        return items.sort((a, b) => {
+            let valA: any;
+            let valB: any;
+
+            if (sortColumn.value === 'id') {
+                valA = a.id;
+                valB = b.id;
+            } 
+            else if (sortColumn.value === 'name') {
+                valA = a.name.toLowerCase();
+                valB = b.name.toLowerCase();
+            } else {
+                return 0; 
+            }
+
+            if (valA < valB) {
+                return sortDirection.value === 'asc' ? -1 : 1;
+            }
+            if (valA > valB) {
+                return sortDirection.value === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    });
+    // --- Fim da Lógica de Busca e Ordenação ---
+
     onMounted(() => {
       fetchCategories();
     });
 
     return {
-      categories,
+      categories, 
       editingCategory,
-      showForm, // NOVO: Exporta o estado showForm
+      showForm,
       saveCategory,
-      showAddForm, // NOVO: Exporta a função showAddForm
+      showAddForm,
       editCategory,
       cancelEdit,
       deleteCategory,
+      
+      // Adicionado para Busca e Ordenação
+      searchTerm,
+      sortColumn,
+      sortDirection,
+      sortTable,
+      sortedCategories, 
     };
   },
 });
@@ -169,7 +322,7 @@ export default defineComponent({
 <style scoped>
 .category-management {
   padding: 20px;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   font-family: sans-serif;
 }
@@ -184,27 +337,27 @@ h2, h3 {
   color: #333;
   margin-bottom: 15px;
 }
-/* NOVO: Estilo para o botão "Adicionar Nova Categoria" */
 .btn-add-new {
   padding: 10px 20px;
-  background-color: #28a745; /* Verde */
+  background-color: #28a745;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
   font-size: 1em;
   margin-bottom: 20px;
-  display: block; /* Ocupa a largura total para fácil clique */
+  display: block;
   width: fit-content;
   margin-left: auto;
   margin-right: auto;
 }
 .btn-add-new:hover {
-  background-color: #218838; /* Verde mais escuro no hover */
+  background-color: #218838;
 }
 
 form {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   margin-bottom: 10px;
 }
@@ -214,15 +367,42 @@ input[type="text"] {
   border: 1px solid #ccc;
   border-radius: 4px;
 }
-button {
-  padding: 8px 15px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  background-color: #007bff;
-  color: white;
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    background-color: #fff;
 }
-button:hover {
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    color: #555;
+}
+.checkbox-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+form button {
+    width: fit-content;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    margin-top: 5px;
+}
+form button:hover {
   background-color: #0056b3;
 }
 .btn-cancel {
@@ -231,6 +411,52 @@ button:hover {
 .btn-cancel:hover {
   background-color: #5a6268;
 }
+
+/* --- Estilos de Busca e Ordenação --- */
+.search-container {
+    margin-bottom: 15px;
+}
+.search-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.data-table th.sortable {
+    cursor: pointer;
+    position: relative;
+    padding-right: 25px;
+    user-select: none;
+}
+
+.data-table th.sortable:hover {
+    background-color: #e0e4e7;
+}
+
+.sort-indicator {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8em;
+    line-height: 1;
+    color: #666;
+}
+
+.data-table th.sortable.sorted-asc,
+.data-table th.sortable.sorted-desc {
+    background-color: #d1e7dd;
+}
+.data-table th.sortable.sorted-asc .sort-indicator {
+    color: #28a745;
+}
+.data-table th.sortable.sorted-desc .sort-indicator {
+    color: #dc3545;
+}
+/* --- Fim Estilos de Busca e Ordenação --- */
+
 
 /* Estilos da Tabela */
 .data-table {
@@ -241,11 +467,15 @@ button:hover {
 .data-table th, .data-table td {
   border: 1px solid #dee2e6;
   padding: 8px;
-  text-align: left;
+  text-align: center;
 }
 .data-table th {
   background-color: #e9ecef;
   font-weight: bold;
+  font-size: 0.85em;
+}
+.data-table td:nth-child(2) {
+  text-align: left;
 }
 .data-table tbody tr:nth-child(even) {
   background-color: #f8f9fa;
@@ -254,7 +484,17 @@ button:hover {
   background-color: #e2e6ea;
 }
 
-/* Estilos para botões com ícones */
+.status-icon {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+.status-icon.success {
+    color: #28a745;
+}
+.status-icon.error {
+    color: #dc3545;
+}
+
 .btn-icon {
   background: none;
   border: none;
@@ -264,8 +504,8 @@ button:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px; /* Tamanho fixo para botões de ícone */
-  height: 30px; /* Tamanho fixo para botões de ícone */
+  width: 30px;
+  height: 30px;
   border-radius: 4px;
 }
 .btn-icon svg {
@@ -274,7 +514,7 @@ button:hover {
 }
 
 .btn-edit {
-  color: #ffc107; /* Amarelo */
+  color: #ffc107;
 }
 .btn-edit:hover {
   background-color: #ffedb8;
@@ -285,7 +525,7 @@ button:hover {
 }
 
 .btn-delete {
-  color: #dc3545; /* Vermelho */
+  color: #dc3545;
 }
 .btn-delete:hover {
   background-color: #f5c6cb;

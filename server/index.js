@@ -20,10 +20,6 @@ const projectRoot = path.join(__dirname, '..'); // Caminho para a raiz do projet
 const publicPath = path.join(projectRoot, 'public'); // Onde ficam as imagens de upload (originalmente)
 const frontendBuildPath = path.join(projectRoot, 'dist'); // Onde o Vite gera o frontend de produção
 
-console.log(`[Backend DEBUG] __dirname: ${__dirname}`);
-console.log(`[Backend DEBUG] projectRoot: ${projectRoot}`);
-console.log(`[Backend DEBUG] publicPath: ${publicPath}`);
-console.log(`[Backend DEBUG] frontendBuildPath: ${frontendBuildPath}`);
 
 // Garante que as pastas de upload existam
 const charactersUploadPath = path.join(publicPath, 'characters');
@@ -43,13 +39,13 @@ if (!fs.existsSync(conexaoImagesUploadPath)) {
 // 1. Servir as pastas de uploads em URLs específicas
 // Isso permite que o frontend acesse imagens de upload como /characters/imagem.png
 app.use('/characters', (req, res, next) => {
-    // console.log(`[Backend DEBUG] Requisição para /characters: ${req.originalUrl}`);
+
     next();
 }, express.static(charactersUploadPath));
 console.log(`[Backend] Servindo imagens de personagens de: ${charactersUploadPath} em '/characters'`);
 
 app.use('/conexao_images', (req, res, next) => {
-    // console.log(`[Backend DEBUG] Requisição para /conexao_images: ${req.originalUrl}`);
+
     next();
 }, express.static(conexaoImagesUploadPath));
 console.log(`[Backend] Servindo imagens de conexão de: ${conexaoImagesUploadPath} em '/conexao_images'`);
@@ -58,13 +54,13 @@ console.log(`[Backend] Servindo imagens de conexão de: ${conexaoImagesUploadPat
 
 // Mover a rota de teste/status para /api/status para não conflitar com o frontend na raiz '/'
 app.get('/api/status', (req, res) => {
-    console.log(`[Backend DEBUG] Requisição para /api/status: ${req.originalUrl}`);
+
     res.send('Servidor Imagem Oculta API está online!');
 });
 
 // Suas rotas existentes da API
 app.get('/api/scores', async (req, res) => {
-    console.log(`[Backend DEBUG] Requisição para /api/scores: ${req.originalUrl}`);
+
     const db = getDb();
     if (!db) { return res.status(500).json({ error: 'Banco de dados não inicializado.' }); }
     try {
@@ -78,7 +74,7 @@ app.get('/api/scores', async (req, res) => {
 });
 
 app.post('/api/scores/update', async (req, res) => {
-    console.log(`[Backend DEBUG] Requisição para /api/scores/update: ${req.originalUrl}`);
+
     const db = getDb();
     if (!db) { return res.status(500).json({ error: 'Banco de dados não inicializado.' }); }
     const { team, pointsToAdd } = req.body;
@@ -95,7 +91,7 @@ app.post('/api/scores/update', async (req, res) => {
 });
 
 app.post('/api/scores/reset', async (req, res) => {
-    console.log(`[Backend DEBUG] Requisição para /api/scores/reset: ${req.originalUrl}`);
+
     const db = getDb();
     if (!db) { return res.status(500).json({ error: 'Banco de dados não inicializado.' }); }
     try {
@@ -114,7 +110,7 @@ app.use('/api', conexaoRoutes);
 // mas *não* o index.html por padrão. Isso é para garantir que a rota SPA abaixo
 // tenha controle total sobre a entrega do index.html.
 app.use((req, res, next) => {
-    // console.log(`[Backend DEBUG] Entrando em express.static(frontendBuildPath, { index: false }) para: ${req.originalUrl}`);
+
     next();
 }, express.static(frontendBuildPath, {
     index: false // Impede que express.static sirva index.html automaticamente
@@ -126,31 +122,31 @@ console.log(`[Backend] Servindo arquivos estáticos (exceto index.html) de: ${fr
 // Este middleware *sem um caminho explícito* será executado para QUALQUER requisição
 // que não foi tratada por NENHUMA das rotas ou middlewares anteriores.
 app.use((req, res) => {
-    console.log(`[Backend DEBUG] === CHEGOU NO FALLBACK SPA === para ${req.originalUrl}`);
+
     const indexPath = path.join(frontendBuildPath, 'index.html');
-    console.log(`[Backend DEBUG] Tentando servir index.html de: ${indexPath}`);
+
 
     // Verifica se o arquivo index.html existe na pasta dist
     if (!fs.existsSync(indexPath)) {
-        console.error(`[Backend DEBUG] ERRO CRÍTICO: index.html NÃO encontrado no caminho: ${indexPath}`);
+    
         return res.status(500).send('Erro interno do servidor: Arquivo index.html do frontend de produção não encontrado.');
     }
 
     // LÊ o conteúdo do arquivo para ter certeza do que está sendo enviado
     fs.readFile(indexPath, 'utf8', (readErr, data) => {
         if (readErr) {
-            console.error(`[Backend DEBUG] ERRO ao ler o arquivo index.html em ${indexPath}: ${readErr.message}`);
+        
             return res.status(500).send('Erro interno do servidor ao ler index.html.');
         }
-        console.log(`[Backend DEBUG] CONTEÚDO DO INDEX.HTML A SER ENVIADO (primeiras 200 chars):\n${data.substring(0, 200)}...`);
+    
         
         // Agora sim, envia o arquivo
         res.sendFile(indexPath, (sendErr) => {
             if (sendErr) {
-                console.error(`[Backend DEBUG] Erro ao enviar index.html de fallback para ${req.originalUrl}: ${sendErr.message}`);
+            
                 res.status(500).send('Erro interno do servidor ao carregar a aplicação.');
             } else {
-                console.log(`[Backend DEBUG] index.html de ${indexPath} enviado com sucesso para ${req.originalUrl}`);
+            
             }
         });
     });

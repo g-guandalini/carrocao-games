@@ -95,6 +95,7 @@ async function createTables() {
             await runAsync("ALTER TABLE categories ADD COLUMN conexao_start INTEGER DEFAULT 0");
             console.log('Coluna "conexao_start" adicionada com sucesso.');
         }
+        // NOVA MIGRAÇÃO: bug_start
         if (!categoryColumnNames.includes('bug_start')) {
             console.log('Coluna "bug_start" não encontrada na tabela "categories". Adicionando...');
             await runAsync("ALTER TABLE categories ADD COLUMN bug_start INTEGER DEFAULT 0");
@@ -188,6 +189,57 @@ async function createTables() {
         //            FIM DAS NOVAS TABELAS PARA CONEXÃO
         // =========================================================
 
+        // =========================================================
+        //                 NOVAS TABELAS PARA BUG
+        // =========================================================
+
+        // Tabela bug_words
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS bug_words (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                word TEXT NOT NULL UNIQUE,
+                order_idx INTEGER DEFAULT NULL
+            );
+        `);
+        console.log('Tabela "bug_words" criada ou já existe.');
+
+        // Lógica de Migração: Verifica e adiciona a coluna order_idx se ela não existir para bug_words
+        let bugWordsTableInfo = await allAsync("PRAGMA table_info(bug_words)");
+        let hasOrderColumnBugWords = bugWordsTableInfo.some(col => col.name === 'order_idx');
+
+        if (!hasOrderColumnBugWords) {
+            console.log('Coluna "order_idx" não encontrada na tabela "bug_words". Adicionando...');
+            await runAsync("ALTER TABLE bug_words ADD COLUMN order_idx INTEGER DEFAULT NULL");
+            console.log('Coluna "order_idx" adicionada com sucesso à tabela "bug_words".');
+        }
+
+        // Tabela de relacionamento category_bug_words
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS category_bug_words (
+                category_id INTEGER NOT NULL,
+                bug_word_id INTEGER NOT NULL,
+                PRIMARY KEY (category_id, bug_word_id),
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
+                FOREIGN KEY (bug_word_id) REFERENCES bug_words(id) ON DELETE CASCADE
+            );
+        `);
+        console.log('Tabela "category_bug_words" criada ou já existe.');
+
+        // Tabela bug_boards
+        // A configuração do tabuleiro será salva como uma string JSON
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS bug_boards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                board_config TEXT NOT NULL
+            );
+        `);
+        console.log('Tabela "bug_boards" criada ou já existe.');
+
+        // =========================================================
+        //            FIM DAS NOVAS TABELAS PARA BUG
+        // =========================================================
+
     } catch (error) {
         console.error('Erro durante a criação ou migração de tabelas:', error);
         throw error; // Rejeita a Promise para que o erro seja propagado
@@ -200,7 +252,7 @@ async function createTables() {
  */
 async function seedInitialData() {
     // Categorias iniciais para teste
-    const initialCategories = ['Personagens', 'Animais', 'Objetos', 'Comida'];
+    const initialCategories = ['Personagens', 'Animais', 'Objetos', 'Comida', 'Geral']; // Adicionei 'Geral'
     const categoryCountRow = await getAsync("SELECT COUNT(*) AS count FROM categories");
     if (categoryCountRow.count === 0) {
         console.log('Populando "categories" com dados iniciais...');
@@ -256,7 +308,7 @@ async function seedInitialData() {
         console.log('Populando "scores" com dados iniciais (0 para cada time)...');
         const initialTeams = ['Azul', 'Vermelho', 'Verde', 'Amarelo'];
         for (const team of initialTeams) {
-            await runAsync("INSERT INTO scores (team, points) VALUES (?, ?)", [team, 0]);
+            await runAsync("INSERT INTO scores (team, points) VALUES (?, ?)", [team, 100]); // Times começam com 100 pontos
         }
         console.log('Scores iniciais inseridos com sucesso.');
     } else {
@@ -301,6 +353,83 @@ async function seedInitialData() {
 
     // =========================================================
     //            FIM DO NOVO SEEDING PARA CONEXÃO
+    // =========================================================
+
+    // =========================================================
+    //              NOVO SEEDING PARA BUG
+    // =========================================================
+
+    const ALL_BUG_WORDS = [
+        { word: 'COMPUTADOR', categoryNames: ['Objetos', 'Geral'], order: 1 },
+        { word: 'PROGRAMACAO', categoryNames: ['Geral'], order: 2 },
+        { word: 'DESENVOLVEDOR', categoryNames: ['Geral'], order: 3 },
+        { word: 'INTELIGENCIA', categoryNames: ['Geral'], order: 4 },
+        { word: 'ALGORITMO', categoryNames: ['Geral'], order: 5 },
+        { word: 'CRIPTOGRAFIA', categoryNames: ['Geral'], order: 6 },
+    ];
+
+    const bugWordCountRow = await getAsync("SELECT COUNT(*) AS count FROM bug_words");
+    if (bugWordCountRow && bugWordCountRow.count === 0) {
+        console.log('Populando "bug_words" com dados iniciais...');
+        const existingCategories = await allAsync("SELECT id, name FROM categories");
+        const categoryMap = new Map(existingCategories.map(cat => [cat.name, cat.id]));
+
+        for (const bugWord of ALL_BUG_WORDS) {
+            const result = await runAsync("INSERT INTO bug_words (word, order_idx) VALUES (?, ?)", [bugWord.word, bugWord.order]);
+            const bugWordId = result.lastID;
+
+            for (const catName of bugWord.categoryNames) {
+                const categoryId = categoryMap.get(catName);
+                if (categoryId) {
+                    await runAsync("INSERT INTO category_bug_words (category_id, bug_word_id) VALUES (?, ?)", [categoryId, bugWordId]);
+                } else {
+                    console.warn(`Categoria '${catName}' não encontrada para a palavra BUG '${bugWord.word}'.`);
+                }
+            }
+        }
+        console.log('Dados iniciais de bug_words e associações inseridos com sucesso.');
+    } else {
+        console.log('Tabela "bug_words" já contém dados. Ignorando seeding.');
+    }
+
+    const ALL_BUG_BOARDS = [
+        {
+            name: 'Tabuleiro Padrão',
+            // Matriz 4x5 (4 linhas, 5 colunas) ou 5x4 (5 linhas, 4 colunas) para 20 quadros
+            // Usaremos 5 linhas e 4 colunas para simplificar visualmente o acesso no frontend (row, col)
+            board_config: JSON.stringify([
+                [10, 20, 'Bug', 30],
+                [20, 'Carroção', 10, 20],
+                [30, 10, 20, 'Bug'],
+                ['Carroção', 20, 30, 10],
+                [10, 30, 20, 'Carroção']
+            ])
+        },
+        {
+            name: 'Tabuleiro Fácil',
+            board_config: JSON.stringify([
+                [10, 20, 30, 10],
+                [20, 10, 20, 'Carroção'],
+                [30, 20, 10, 30],
+                [10, 'Carroção', 20, 10],
+                [20, 30, 10, 20]
+            ])
+        },
+    ];
+
+    const bugBoardCountRow = await getAsync("SELECT COUNT(*) AS count FROM bug_boards");
+    if (bugBoardCountRow && bugBoardCountRow.count === 0) {
+        console.log('Populando "bug_boards" com dados iniciais...');
+        for (const board of ALL_BUG_BOARDS) {
+            await runAsync("INSERT INTO bug_boards (name, board_config) VALUES (?, ?)", [board.name, board.board_config]);
+        }
+        console.log('Dados iniciais de bug_boards inseridos com sucesso.');
+    } else {
+        console.log('Tabela "bug_boards" já contém dados. Ignorando seeding.');
+    }
+
+    // =========================================================
+    //            FIM DO NOVO SEEDING PARA BUG
     // =========================================================
 }
 

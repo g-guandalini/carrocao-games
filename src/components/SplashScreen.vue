@@ -11,9 +11,11 @@
 
 <script lang="ts">
 import { defineComponent, computed, onMounted, onUnmounted } from 'vue';
-import { scoreStore, resetScores } from '../store/scoreStore';
+// CORRIGIDO: Adicionando fetchScores ao import da scoreStore
+import { scoreStore, resetScores, fetchScores } from '../store/scoreStore'; 
 import { resetImagemOcultaGameScores } from '../store/imagemOcultaStore'; 
-import { resetConexaoGameScores } from '../store/conexaoStore'; // Importado resetConexaoGameScores
+import { resetConexaoGameScores } from '../store/conexaoStore'; 
+import { resetBugGameScores } from '../store/bugStore'; 
 import { useRouter } from 'vue-router'; 
 
 // Interface para as partículas dos fogos de artifício
@@ -32,8 +34,8 @@ interface Particle {
 
 export default defineComponent({
   name: 'SplashScreen',
-  emits: ['select-bug'],
-  setup(_props, { emit }) {
+  emits: [], 
+  setup(_props) { 
     const router = useRouter();
 
     const hasScoresToClear = computed(() => {
@@ -45,20 +47,25 @@ export default defineComponent({
 
     const clearAllScores = async () => {
       if (confirm('Tem certeza que deseja limpar todas as pontuações? Esta ação não pode ser desfeita.')) {
-        await resetScores();
+        await resetScores(); 
+        await resetImagemOcultaGameScores(); 
+        await resetConexaoGameScores(); 
+        await resetBugGameScores(); 
       }
     };
 
-    // navigateToGame alterado para rotear Conexão diretamente
-    const navigateToGame = async (gameType: 'imagem-oculta' | 'conexao') => {
-      console.log(`[SplashScreen] Clicou em ${gameType === 'imagem-oculta' ? 'Imagem Oculta' : 'Conexão'}. Iniciando jogo.`);
+    const navigateToGame = async (gameType: 'imagem-oculta' | 'conexao' | 'bug') => {
+      console.log(`[SplashScreen] Clicou em ${gameType === 'imagem-oculta' ? 'Imagem Oculta' : gameType === 'conexao' ? 'Conexão' : 'BUG'}. Iniciando jogo.`);
       
       if (gameType === 'imagem-oculta') {
         await resetImagemOcultaGameScores(); 
-        router.push({ name: 'ImagemOcultaGame' }); // Navega diretamente para o jogo Imagem Oculta
+        router.push({ name: 'ImagemOcultaGame' }); 
       } else if (gameType === 'conexao') {
-        await resetConexaoGameScores(); // Reseta os scores do jogo de Conexão
-        router.push({ name: 'ConexaoGame' }); // Navega diretamente para o jogo Conexão
+        await resetConexaoGameScores(); 
+        router.push({ name: 'ConexaoGame' }); 
+      } else if (gameType === 'bug') { 
+        await resetBugGameScores(); 
+        router.push({ name: 'BugGame' });
       }
     };
 
@@ -80,14 +87,14 @@ export default defineComponent({
       '4': '#f1c40f', // Amarelo
     };
 
-    // NOVO: Mapeamento de teclas para ações (incluindo 'A' para Admin)
+    // Mapeamento de teclas para ações (incluindo 'A' para Admin)
     const ACTION_KEYS: { [key: string]: () => void } = {
-      'A': () => navigateToAdmin(), // Mapeia 'A' para a função de admin
-      'C': () => navigateToGame('conexao'), // Mapeia 'C' para Conexão (agora vai direto)
-      'I': () => navigateToGame('imagem-oculta'), // Mapeia 'I' para Imagem Oculta
-      'B': () => {
-        console.log("Bug action triggered via key 'B'. Emitting 'select-bug'.");
-        emit('select-bug');
+      'A': () => navigateToAdmin(), 
+      'C': () => navigateToGame('conexao'), 
+      'I': () => navigateToGame('imagem-oculta'), 
+      'B': () => { 
+        console.log("Bug action triggered via key 'B'. Navigating to BugGame.");
+        navigateToGame('bug');
       },
       'L': () => { 
         if (hasScoresToClear.value) {
@@ -103,7 +110,7 @@ export default defineComponent({
     const hexToRgb = (hex: string): string => {
       const r = parseInt(hex.slice(1, 3), 16);
       const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
+      b: parseInt(hex.slice(5, 7), 16);
       return `${r}, ${g}, ${b}`;
     };
 
@@ -204,7 +211,7 @@ export default defineComponent({
 
     // Lida com o evento de pressionar uma tecla
     const handleKeyPress = (event: KeyboardEvent) => {
-      const key = event.key.toUpperCase(); // Converte para maiúscula para as teclas de ação
+      const key = event.key.toUpperCase(); 
 
       // Verifica se é uma tecla de fogos de artifício
       const fireworkColor = FIREWORK_COLORS[key];
@@ -229,6 +236,7 @@ export default defineComponent({
       setupCanvas(); 
       window.addEventListener('keydown', handleKeyPress); 
       window.addEventListener('resize', setupCanvas); 
+      fetchScores(); // Garante que as pontuações estejam carregadas
     });
 
     onUnmounted(() => {
@@ -240,10 +248,9 @@ export default defineComponent({
     });
 
     return {
-      // Essas funções são mantidas no return caso sejam chamadas de outros lugares (ex: mapeamento de teclas)
       hasScoresToClear,
       clearAllScores,
-      navigateToGame, // Alterado para navigateToGame
+      navigateToGame,
       navigateToAdmin,
     };
   },
@@ -264,7 +271,7 @@ html, body {
   width: 100vw;
   height: 100vh;
   pointer-events: none; 
-  z-index: 999; /* Ainda acima do logo */
+  z-index: 999; 
 }
 
 .splash-screen-wrapper {
@@ -290,8 +297,6 @@ html, body {
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 2; /* O logo estará acima do wrapper de fundo */
+  z-index: 2; 
 }
-
-/* Removido completamente o CSS relacionado ao '.admin-button' */
 </style>

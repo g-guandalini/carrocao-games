@@ -127,9 +127,9 @@ export default defineComponent({
       id: 0, 
       name: '', 
       // Garante que os defaults são booleanos para o v-model do checkbox
-      imagem_oculta_start: false, 
-      conexao_start: false,       
-      bug_start: false            
+      imagem_oculta_start: 0, 
+      conexao_start: 0,       
+      bug_start: 0            
     }); 
     const showForm = ref(false);
 
@@ -147,9 +147,9 @@ export default defineComponent({
         // Mapeia os valores 0/1 do backend para booleanos no frontend
         categories.value = response.data.map(cat => ({
           ...cat,
-          imagem_oculta_start: Boolean(cat.imagem_oculta_start),
-          conexao_start: Boolean(cat.conexao_start),
-          bug_start: Boolean(cat.bug_start),
+          imagem_oculta_start: (cat.imagem_oculta_start),
+          conexao_start: (cat.conexao_start),
+          bug_start: (cat.bug_start),
         }));
       } catch (error) {
         console.error('Erro ao buscar categorias:', error);
@@ -204,9 +204,9 @@ export default defineComponent({
       // Copia a categoria, garantindo que os valores são booleanos para o v-model do checkbox
       editingCategory.value = { 
         ...category,
-        imagem_oculta_start: Boolean(category.imagem_oculta_start),
-        conexao_start: Boolean(category.conexao_start),
-        bug_start: Boolean(category.bug_start),
+        imagem_oculta_start: (category.imagem_oculta_start),
+        conexao_start: (category.conexao_start),
+        bug_start: (category.bug_start),
       }; 
       showForm.value = true;
     };
@@ -220,9 +220,9 @@ export default defineComponent({
         editingCategory.value = { 
             id: 0, 
             name: '', 
-            imagem_oculta_start: false, 
-            conexao_start: false, 
-            bug_start: false 
+            imagem_oculta_start: 0, 
+            conexao_start: 0, 
+            bug_start: 0 
         };
     }
 

@@ -20,6 +20,7 @@
       :game-status="conexaoStore.gameStatus"
       @next-round="handleNextRoundFromScoreboard"
       @reset-game="handleResetGame"
+      class="scoreboard-area-layout"
     />
 
     <p v-else-if="conexaoStore.gameStatus === 'idle' && !conexaoStore.currentRoundConexao && !conexaoStore.isLoadingConexoes" class="loading-message">
@@ -143,5 +144,15 @@ export default defineComponent({
   margin-top: 50px;
   font-size: 1.2em;
   color: #555;
+}
+
+.scoreboard-area-layout {
+  flex-grow: 1;
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 </style>

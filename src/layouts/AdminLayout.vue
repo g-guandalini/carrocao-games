@@ -5,7 +5,6 @@
         <img src="/logo_sitio.png" alt="Admin Carroção Logo" class="sidebar-logo" />
       </div>
 
-      <!-- Navegação Principal (excluindo "Voltar ao Jogo") -->
       <nav class="sidebar-nav-main">
         <ul>
           <li>
@@ -23,24 +22,36 @@
               <i class="fas fa-plug"></i> Conexão
             </router-link>
           </li>
+          <li>
+            <router-link :to="{ name: 'AdminBugWords' }" class="nav-link">
+              <i class="fas fa-bug"></i> Palavras BUG
+            </router-link>
+          </li>
+          <li>
+            <router-link :to="{ name: 'AdminBugBoards' }" class="nav-link">
+              <i class="fas fa-th-large"></i> Tabuleiros BUG
+            </router-link>
+          </li>
+          <li>
+            <router-link :to="{ name: 'AdminScores' }" class="nav-link"> <!-- NOVO LINK -->
+              <i class="fas fa-trophy"></i> Pontuações
+            </router-link>
+          </li>
         </ul>
       </nav>
 
-      <!-- Novo: Contêiner para o botão "Voltar ao Jogo" na parte inferior -->
       <div class="sidebar-bottom-action">
         <router-link :to="{ name: 'Home' }" class="nav-link">
           <i class="fas fa-home"></i> Voltar ao Jogo
         </router-link>
       </div>
 
-      <!-- Footer do Sidebar -->
       <div class="sidebar-footer">
         Desenvolvido por: Guandalini
       </div>
     </aside>
 
     <main class="admin-content">
-      <!-- NOVO: Wrapper para aplicar o padding e permitir que o admin-content gerencie o scroll -->
       <div class="admin-content-wrapper">
         <div class="admin-content-header">
           <h2 class="page-title">{{ $route.meta.title || $route.name }}</h2>
@@ -62,31 +73,31 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* Adicionado: Garante que o HTML e o Body preencham a tela e evitam a rolagem da página inteira */
+/* O CSS permanece o mesmo que você já tem para AdminLayout */
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%; /* Garante que o body tenha altura para 'vh' e '%' funcionarem */
-  overflow: hidden; /* Impede que a barra de rolagem apareça no corpo da página */
+  height: 100%;
+  overflow: hidden;
 }
 
 .admin-layout {
   display: flex;
-  height: 100vh; /* O layout principal sempre ocupará 100% da altura da viewport */
+  height: 100vh;
   background-color: #f0f2f5;
   font-family: 'Poppins', sans-serif;
 }
 
 .admin-sidebar {
   width: 250px;
-  background-color: #363435; /* Cor de fundo do menu */
+  background-color: #363435;
   color: #ecf0f1;
   padding: 0;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 100%; /* Ocupa 100% da altura do seu pai (.admin-layout) */
+  height: 100%;
 }
 
 .sidebar-header {
@@ -104,11 +115,10 @@ html, body {
   display: block;
 }
 
-/* Antigo .sidebar-nav, agora renomeado e com flex-grow */
 .sidebar-nav-main {
-  flex-grow: 1; /* Permite que esta seção ocupe o espaço vertical restante no sidebar */
+  flex-grow: 1;
   padding: 20px 0;
-  overflow-y: auto; /* A barra de rolagem aparecerá aqui se os itens de navegação estourarem */
+  overflow-y: auto;
 }
 
 .sidebar-nav-main ul {
@@ -164,20 +174,18 @@ html, body {
 }
 
 .admin-content {
-  flex-grow: 1; /* Ocupa todo o espaço horizontal restante */
-  height: 100%; /* Ocupa 100% da altura do seu pai (.admin-layout) */
-  overflow-y: auto; /* **ESSENCIAL**: A barra de rolagem aparecerá aqui para o conteúdo principal */
+  flex-grow: 1;
+  height: 100%;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  /* O padding foi movido para o .admin-content-wrapper */
 }
 
-/* NOVO: Wrapper para o conteúdo principal para aplicar o padding */
 .admin-content-wrapper {
-  flex-grow: 1; /* Ocupa todo o espaço vertical disponível dentro de .admin-content */
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  padding: 30px; /* O padding é aplicado aqui, dentro da área de rolagem */
+  padding: 30px;
 }
 
 .admin-content-header {
@@ -197,6 +205,6 @@ html, body {
   padding: 25px;
   border-radius: 10px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  flex-grow: 1; /* Permite que o corpo do conteúdo principal ocupe o espaço restante */
+  flex-grow: 1;
 }
 </style>

@@ -58,6 +58,8 @@
 
     <!-- Elemento de áudio para som de digitação (MANTIDO) -->
     <audio ref="typingAudio" src="/sounds/typing-sound.mp3" preload="auto" loop></audio>
+    <!-- NOVO: Elemento de áudio para som de resposta correta -->
+    <audio ref="correctAnswerAudio" src="/sounds/correct-answer.mp3" preload="auto"></audio>
   </div>
 </template>
 
@@ -103,6 +105,7 @@ export default defineComponent({
   setup(_props, { emit }) {
     const imageDisplayRef = ref<HTMLElement | null>(null);
     const typingAudio = ref<HTMLAudioElement | null>(null);
+    const correctAnswerAudio = ref<HTMLAudioElement | null>(null); // NOVO: Ref para o áudio de resposta correta
 
     const calculatedImageWidth = ref(0); // Dimensões do CONTEÚDO da imagem (para ImageTiler)
     const calculatedImageHeight = ref(0); // Dimensões do CONTEÚDO da imagem (para ImageTiler)
@@ -314,6 +317,12 @@ export default defineComponent({
 
     const handleCorrectAnswer = () => {
         console.log('Resposta confirmada como CORRETA!');
+        // NOVO: Tocar som de resposta correta
+        if (correctAnswerAudio.value) {
+            correctAnswerAudio.value.currentTime = 0; // Reinicia o áudio se já estiver tocando
+            correctAnswerAudio.value.play().catch(e => console.warn("Autoplay de audio de resposta correta bloqueado:", e));
+        }
+
         if (_props.activeTeam) {
           winningTeamColorHex.value = teamColorToHex(_props.activeTeam);
           showFireworks.value = true;
@@ -340,6 +349,7 @@ export default defineComponent({
       stopTypingAndProceed,
       imageDisplayRef,
       typingAudio,
+      correctAnswerAudio, // NOVO: Retorna a ref do áudio de resposta correta
       displayedHint,
       isTyping,
       currentPotentialRoundScore,

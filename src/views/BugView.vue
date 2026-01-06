@@ -1,50 +1,66 @@
 <template>
   <div class="game-page-container bug-game">
-    <div v-if="bugStore.isLoadingBugWords || bugStore.isLoadingBugBoards" class="overlay-message loading-overlay">
-      <p>Carregando jogo BUG...</p>
-    </div>
+    <GameHeader />
 
-    <div v-else-if="bugStore.gameStatus === 'idle'" class="overlay-message game-message">
-      <p>Nenhuma palavra ou tabuleiro disponível para o jogo BUG.</p>
-      <button @click="startNewRound" class="btn-action start-game">Iniciar Nova Rodada</button>
-    </div>
+    <div class="game-content-wrapper">
+      <!-- 1. Mostra o estado de carregamento global se o jogo estiver inicializando -->
+      <div v-if="bugStore.isInitializing" class="overlay-message loading-overlay">
+        <p>Carregando jogo BUG...</p>
+      </div>
 
-    <div v-else-if="bugStore.gameStatus === 'scoreboard'" class="overlay-message game-message">
-      <p>Fim da rodada! Veja o placar final.</p>
-      <ScoreboardScreen :scores="scoreStore.score" />
-      <button @click="startNewRound" class="btn-action next-round">Iniciar Próxima Rodada</button>
-    </div>
+      <!-- 2. Se não estiver inicializando, mas ainda estiver carregando dados específicos da rodada -->
+      <div v-else-if="bugStore.isLoadingBugWords || bugStore.isLoadingBugBoards" class="overlay-message loading-overlay">
+        <p>Carregando dados da rodada...</p>
+      </div>
 
-    <div v-else class="game-active-area">
-      <BugDrawPhase
-        v-if="bugStore.gameStatus === 'bug_draw_phase'"
-        :currentTurnTeam="bugStore.currentTurnTeam"
-        :roundOptions="bugStore.roundOptions"
-        :disabledTeams="bugStore.disabledTeamsForRound"
-        @option-selected="handleOptionSelected"
-        @teams-removed="handleTeamsRemoved"
+      <!-- 3. Se estiver idle E NÃO houver palavras/tabuleiros disponíveis (após inicialização/carregamento) -->
+      <div v-else-if="bugStore.gameStatus === 'idle' && (!bugStore.availableWords.length || !bugStore.availableBoards.length)" class="overlay-message game-message">
+        <p>Nenhuma palavra ou tabuleiro disponível para o jogo BUG.</p>
+        <!-- Não há botão de iniciar aqui, pois não há dados para começar -->
+      </div>
+
+      <!-- 5. Tela do placar -->
+      <ScoreboardScreen
+        v-else-if="bugStore.gameStatus === 'scoreboard'"
+        :game-status="bugStore.gameStatus"
+        @next-round="startNewRound"
+        @reset-game="handleResetGame"
+        @exit-scoreboard="handleExitScoreboard"
+        class="scoreboard-area-layout"
       />
 
-      <BugWordPhase
-        v-else-if="bugStore.gameStatus === 'bug_word_phase' && bugStore.currentRoundWord"
-        :currentWord="bugStore.currentRoundWord.word"
-        :scrambledWord="scrambledWordComputed"
-        :activeTeam="bugStore.guessingTeam"
-        :disabledTeams="bugStore.disabledTeamsForRound"
-        @set-guessing-team="setGuessingTeam"
-        @correct-guess="handleCorrectGuess"
-        @wrong-guess="handleWrongGuess"
-      />
+      <!-- 6. Fases ativas do jogo -->
+      <div v-else class="game-active-area">
+        <BugDrawPhase
+          v-if="bugStore.gameStatus === 'bug_draw_phase'"
+          :currentTurnTeam="bugStore.currentTurnTeam"
+          :roundOptions="bugStore.roundOptions"
+          :disabledTeams="bugStore.disabledTeamsForRound" 
+          @option-selected="handleOptionSelected"
+          @teams-removed="handleTeamsRemoved"
+        />
 
-      <BugBoardPhase
-        v-else-if="bugStore.gameStatus === 'bug_board_phase' && bugStore.currentBugBoard"
-        :currentBoard="bugStore.currentBugBoard"
-        :revealedTiles="bugStore.revealedBoardTiles"
-        :currentTurnTeam="bugStore.currentTurnTeam"
-        :awaitingTileConfirmation="bugStore.awaitingTileConfirmation"
-        @tile-selected="handleTileSelected"
-        @confirm-board-action="confirmBoardTileAction"
-      />
+        <BugWordPhase
+          v-else-if="bugStore.gameStatus === 'bug_word_phase' && bugStore.currentRoundWord"
+          :currentWord="bugStore.currentRoundWord.word"
+          :scrambledWord="scrambledWordComputed"
+          :activeTeam="bugStore.guessingTeam"
+          :disabledTeams="combinedDisabledTeamsForWordPhase" 
+          @set-guessing-team="setGuessingTeam"
+          @correct-guess="handleCorrectGuess"
+          @wrong-guess="handleWrongGuess"
+        />
+
+        <BugBoardPhase
+          v-else-if="bugStore.gameStatus === 'bug_board_phase' && bugStore.currentBugBoard"
+          :currentBoard="bugStore.currentBugBoard"
+          :revealedTiles="bugStore.revealedBoardTiles"
+          :teamPlayingBoard="bugStore.guessingTeam"
+          :awaitingTileConfirmation="bugStore.awaitingTileConfirmation"
+          @tile-selected="handleTileSelected"
+          @confirm-board-action="confirmBoardAction"
+        ></BugBoardPhase>
+      </div>
     </div>
   </div>
 </template>
@@ -54,10 +70,12 @@ import { defineComponent, onMounted, computed, watch } from 'vue';
 import { bugStore, initializeBugGame, startNewCleanBugRound, selectLotteryOption, setGuessingTeam, handleOperatorBugFeedback, selectBoardTile, confirmTileAction, viewBugScoreboard, selectTeamToRemove, currentWordPotentialScore } from '../store/bugStore';
 import { scoreStore, fetchScores } from '../store/scoreStore';
 import { TeamColor, GameStatus } from '../types';
-import ScoreboardScreen from '../components/ScoreboardScreen.vue'; 
+import ScoreboardScreen from '../components/ScoreboardScreen.vue';
 import BugDrawPhase from '../components/BugDrawPhase.vue';
 import BugWordPhase from '../components/BugWordPhase.vue';
 import BugBoardPhase from '../components/BugBoardPhase.vue';
+import GameHeader from '../components/GameHeader.vue';
+import { useRouter } from 'vue-router';
 
 function scrambleWord(word: string): string {
     const a = word.split('');
@@ -75,23 +93,39 @@ function scrambleWord(word: string): string {
 export default defineComponent({
   name: 'BugView',
   components: {
-    ScoreboardScreen, 
+    ScoreboardScreen,
     BugDrawPhase,
     BugWordPhase,
     BugBoardPhase,
+    GameHeader,
   },
   setup() {
+    const router = useRouter();
+
     onMounted(async () => {
       await fetchScores();
-      await initializeBugGame();
+      await initializeBugGame(); // Garante que a inicialização ocorra ao montar
     });
 
     const startNewRound = async () => {
         await startNewCleanBugRound();
     };
 
+    const handleResetGame = () => {
+      router.push({ name: 'Home' });
+    };
+
+    const handleExitScoreboard = () => {
+      router.push({ name: 'Home' });
+    };
+
     const scrambledWordComputed = computed(() => {
         return bugStore.currentRoundWord ? scrambleWord(bugStore.currentRoundWord.word) : '';
+    });
+
+    // NOVO: Propriedade computada para combinar os times desabilitados
+    const combinedDisabledTeamsForWordPhase = computed(() => {
+      return new Set([...bugStore.disabledTeamsForRound, ...bugStore.disabledTeamsForGuessing]);
     });
 
     const handleOptionSelected = async (option: string, chosenPoints?: number) => {
@@ -100,97 +134,97 @@ export default defineComponent({
 
     const handleTeamsRemoved = async (teams: TeamColor[]) => {
       for (const team of teams) {
-        selectTeamToRemove(team); 
+        selectTeamToRemove(team);
       }
       bugStore.gameStatus = 'bug_word_phase';
     };
 
     const handleCorrectGuess = async () => {
       if (bugStore.guessingTeam) {
-        const teamWhoGuessed = bugStore.guessingTeam;
+        // const teamWhoGuessed = bugStore.guessingTeam; // Variável não utilizada
         await handleOperatorBugFeedback(true, bugStore.guessingTeam);
-        console.log(`Time ${teamWhoGuessed} acertou a palavra e ganhou ${currentWordPotentialScore.value} pontos!`);
       }
     };
 
     const handleWrongGuess = async () => {
       if (bugStore.guessingTeam) {
-        const teamWhoGuessed = bugStore.guessingTeam;
+        // const teamWhoGuessed = bugStore.guessingTeam; // Variável não utilizada
         await handleOperatorBugFeedback(false, bugStore.guessingTeam);
-        console.log(`Time ${teamWhoGuessed} errou e está fora da rodada!`);
       }
     };
 
     const handleTileSelected = async (row: number, col: number) => {
         await selectBoardTile(row, col);
-        console.log(`Tile selecionado! Aguardando confirmação.`);
     };
 
-    const confirmBoardTileAction = () => {
+    const confirmBoardAction = () => {
       confirmTileAction();
     };
 
-    watch(() => bugStore.gameStatus, (newStatus) => {
-      if (newStatus === 'bug_draw_phase') {
-        console.log("Iniciando Fase de Sorteio");
-      } else if (newStatus === 'bug_word_phase') {
-        console.log("Iniciando Fase da Palavra");
-      } else if (newStatus === 'bug_board_phase') {
-        console.log("Iniciando Fase do Tabuleiro");
-      } else if (newStatus === 'scoreboard') {
-        console.log("Exibindo Placar");
-      }
+    watch(() => bugStore.gameStatus, (newStatus, oldStatus) => {
+      // Logs de status de jogo removidos
     });
 
     return {
       bugStore,
       scoreStore,
       startNewRound,
+      handleResetGame,
+      handleExitScoreboard,
       scrambledWordComputed,
+      combinedDisabledTeamsForWordPhase, // EXPOR A NOVA PROPRIEDADE COMPUTADA
       handleOptionSelected,
       handleTeamsRemoved,
       setGuessingTeam,
       handleCorrectGuess,
       handleWrongGuess,
       handleTileSelected,
-      confirmBoardTileAction,
+      confirmBoardAction,
     };
   },
 });
 </script>
 
 <style scoped>
-html, body { /* Adicionado para garantir que o html/body não tenham margens */
+html, body {
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Garante que não haja rolagem vertical no nível do body */
+  overflow: hidden;
 }
 
 .game-page-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* Centraliza verticalmente o conteúdo principal */
-  width: 100vw; /* Ocupa a largura total da viewport */
-  height: 100vh; /* Ocupa a altura total da viewport */
-  padding: 10px; /* Um pouco de padding para não grudar nas bordas */
+  width: 100vw;
+  height: 100vh;
   background-color: #f0f2f5;
   color: #333;
-  box-sizing: border-box; /* Garante que padding não cause overflow */
-  overflow: hidden; /* Remove rolagem vertical para o container */
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
-.overlay-message { /* Classes combinadas para loading/idle/scoreboard */
-  padding: 30px; /* Reduzido um pouco */
+.game-content-wrapper {
+  flex-grow: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.overlay-message {
+  padding: 30px;
   background-color: #fff;
   border-radius: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   text-align: center;
-  font-size: 1.5em; /* Reduzido um pouco */
+  font-size: 1.5em;
   color: #555;
-  /* margin-top removido, o justify-content: center do parent lida com isso */
-  max-height: 90vh; /* Para garantir que não estoure em telas pequenas */
-  overflow-y: auto; /* Adiciona rolagem se a mensagem for muito grande, mas tenta evitar */
+  max-height: 90vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -202,10 +236,10 @@ html, body { /* Adicionado para garantir que o html/body não tenham margens */
 }
 
 .btn-action {
-  padding: 12px 25px; /* Reduzido um pouco */
-  font-size: 1.1em; /* Reduzido um pouco */
+  padding: 12px 25px;
+  font-size: 1.1em;
   font-weight: bold;
-  margin-top: 20px; /* Reduzido um pouco */
+  margin-top: 20px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -225,11 +259,19 @@ html, body { /* Adicionado para garantir que o html/body não tenham margens */
 
 .game-active-area {
     width: 100%;
-    height: 100%; /* Ocupa toda a altura disponível do flex container */
+    height: 100%;
     display: flex;
     justify-content: center;
-    align-items: center; /* Centraliza a fase do jogo */
-    /* margin-top removido, o justify-content do parent lida com isso */
-    flex-grow: 1; /* Permite que esta área ocupe o espaço extra */
+    align-items: center;
+}
+
+.scoreboard-area-layout {
+  flex-grow: 1;
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 </style>

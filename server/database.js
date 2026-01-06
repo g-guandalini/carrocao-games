@@ -398,21 +398,19 @@ async function seedInitialData() {
             // Matriz 4x5 (4 linhas, 5 colunas) ou 5x4 (5 linhas, 4 colunas) para 20 quadros
             // Usaremos 5 linhas e 4 colunas para simplificar visualmente o acesso no frontend (row, col)
             board_config: JSON.stringify([
-                [10, 20, 'Bug', 30],
-                [20, 'Carroção', 10, 20],
-                [30, 10, 20, 'Bug'],
-                ['Carroção', 20, 30, 10],
-                [10, 30, 20, 'Carroção']
+                [10, 20, 'Bug', 30, 20],
+                [20, 'Carroção', 10, 20, 20],
+                [30, 10, 20, 'Bug', 20],
+                ['Carroção', 20, 30, 10, 20]
             ])
         },
         {
             name: 'Tabuleiro Fácil',
             board_config: JSON.stringify([
-                [10, 20, 30, 10],
-                [20, 10, 20, 'Carroção'],
-                [30, 20, 10, 30],
-                [10, 'Carroção', 20, 10],
-                [20, 30, 10, 20]
+                [10, 20, 'Bug', 30, 20],
+                [20, 'Carroção', 10, 20, 20],
+                [30, 10, 20, 'Bug', 20],
+                ['Carroção', 20, 30, 10, 20]
             ])
         },
     ];

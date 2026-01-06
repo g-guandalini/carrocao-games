@@ -56,6 +56,8 @@
 
     <!-- Elemento de áudio para som de digitação (MANTIDO) -->
     <audio ref="typingAudio" src="/sounds/typing-sound.mp3" preload="auto" loop></audio>
+    <!-- NOVO: Elemento de áudio para som de resposta correta -->
+    <audio ref="correctAnswerAudio" src="/sounds/correct-answer.mp3" preload="auto"></audio>
   </div>
 </template>
 
@@ -101,6 +103,7 @@ export default defineComponent({
   setup(_props, { emit }) {
     const imageDisplayRef = ref<HTMLElement | null>(null);
     const typingAudio = ref<HTMLAudioElement | null>(null);
+    const correctAnswerAudio = ref<HTMLAudioElement | null>(null); // NOVO: Ref para o áudio de resposta correta
 
     const calculatedImageWidth = ref(0); // Dimensões do CONTEÚDO da imagem (para ImageTiler)
     const calculatedImageHeight = ref(0); // Dimensões do CONTEÚDO da imagem (para ImageTiler)
@@ -185,22 +188,8 @@ export default defineComponent({
         const availableWidthForDisplay = Math.floor(imageDisplayRef.value.offsetWidth);
         const availableHeightForDisplay = Math.floor(imageDisplayRef.value.offsetHeight);
 
-        // --- Adicionado para depuração ---
-        console.group('Debug Image Dimensions');
-        console.log('gameStatus:', _props.gameStatus);
-        console.log('imageDisplayRef.value:', imageDisplayRef.value);
-        console.log('imageDisplayRef offsetWidth:', availableWidthForDisplay);
-        console.log('imageDisplayRef offsetHeight:', availableHeightForDisplay);
-        // --- Fim da depuração ---
-
         const contentWidthLimit = availableWidthForDisplay - (2 * BORDER_SIZE_PX);
         const contentHeightLimit = availableHeightForDisplay - (2 * BORDER_SIZE_PX);
-
-        // --- Adicionado para depuração ---
-        console.log('BORDER_SIZE_PX:', BORDER_SIZE_PX);
-        console.log('contentWidthLimit (available for image content):', contentWidthLimit);
-        console.log('contentHeightLimit (available for image content):', contentHeightLimit);
-        // --- Fim da depuração ---
 
         let finalImageContentWidth: number;
         let finalImageContentHeight: number;
@@ -210,11 +199,6 @@ export default defineComponent({
           if (calculatedImageHeight.value !== 0) calculatedImageHeight.value = 0;
           if (imageFrameComputedWidth.value !== '0px') imageFrameComputedWidth.value = '0px';
           if (imageFrameComputedHeight.value !== '0px') imageFrameComputedHeight.value = '0px';
-          
-          // --- Adicionado para depuração ---
-          console.error('Calculated image dimensions are zero or negative. Image will not be displayed.');
-          console.groupEnd(); // Fecha o grupo de depuração
-          // --- Fim da depuração ---
           return;
         }
 
@@ -232,12 +216,6 @@ export default defineComponent({
         if (finalImageContentWidth < fixedGridSize) finalImageContentWidth = fixedGridSize;
         if (finalImageContentHeight < fixedGridSize) finalImageContentHeight = fixedGridSize;
 
-        // --- Adicionado para depuração ---
-        console.log('finalImageContentWidth (after aspect ratio & gridSize adjust):', finalImageContentWidth);
-        console.log('finalImageContentHeight (after aspect ratio & gridSize adjust):', finalImageContentHeight);
-        console.groupEnd(); // Fecha o grupo de depuração
-        // --- Fim da depuração ---
-
         if (calculatedImageWidth.value !== finalImageContentWidth) {
           calculatedImageWidth.value = finalImageContentWidth;
         }
@@ -254,12 +232,6 @@ export default defineComponent({
         if (imageFrameComputedHeight.value !== newFrameHeight) {
           imageFrameComputedHeight.value = newFrameHeight;
         }
-      } else {
-         // --- Adicionado para depuração ---
-         console.group('Debug Image Dimensions');
-         console.warn('imageDisplayRef is null. Cannot update image dimensions.');
-         console.groupEnd();
-         // --- Fim da depuração ---
       }
     };
 
@@ -337,6 +309,12 @@ export default defineComponent({
 
     const handleCorrectAnswer = () => {
         console.log('Resposta confirmada como CORRETA!');
+        // NOVO: Tocar som de resposta correta
+        if (correctAnswerAudio.value) {
+            correctAnswerAudio.value.currentTime = 0; // Reinicia o áudio se já estiver tocando
+            correctAnswerAudio.value.play().catch(e => console.warn("Autoplay de audio de resposta correta bloqueado:", e));
+        }
+
         if (_props.activeTeam) {
           winningTeamColorHex.value = teamColorToHex(_props.activeTeam);
           showFireworks.value = true;
@@ -363,6 +341,7 @@ export default defineComponent({
       stopTypingAndProceed,
       imageDisplayRef,
       typingAudio,
+      correctAnswerAudio, // NOVO: Retorna a ref do áudio de resposta correta
       displayedHint,
       isTyping,
       currentPotentialRoundScore,

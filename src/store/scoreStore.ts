@@ -31,7 +31,6 @@ export async function fetchScores() {
     const scores = await response.json();
     // Atualiza o objeto score na store com os dados do backend
     scoreStore.score = scores;
-    console.log('Scores carregados do banco de dados:', scores);
   } catch (error) {
     console.error('Falha ao buscar scores:', error);
   } finally {
@@ -56,7 +55,7 @@ export async function updateScore(team: TeamColor, pointsToAdd: number) {
       throw new Error(`Erro HTTP ao atualizar pontuação: ${response.status}`);
     }
     // Após a atualização bem-sucedida, busca as pontuações novamente para garantir a sincronia
-    await fetchScores();
+    await fetchScores(); // MANTIDO AQUI
   } catch (error) {
     console.error('Falha ao atualizar pontuação no backend:', error);
   }
@@ -79,7 +78,7 @@ export async function setScore(team: TeamColor, points: number) {
       throw new Error(`Erro HTTP ao definir pontuação: ${response.status}`);
     }
     // Após a definição bem-sucedida, busca as pontuações novamente para garantir a sincronia
-    await fetchScores();
+    await fetchScores(); // MANTIDO AQUI
   } catch (error) {
     console.error(`Falha ao definir pontuação para o time ${team}:`, error);
   }

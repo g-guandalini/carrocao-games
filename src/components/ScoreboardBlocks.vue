@@ -23,7 +23,6 @@
   
   <script lang="ts">
   import { defineComponent, PropType } from 'vue';
-  import { TeamColor } from '../types'; 
   
   interface ScoreItem {
     name: string;

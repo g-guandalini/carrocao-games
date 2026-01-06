@@ -5,15 +5,21 @@ import { AdminState } from '../types';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const initialState: AdminState = {
-  categories: [],
-  imagemOcultaItems: [],
-  conexaoItems: [], // Adicionado conforme a nova interface
-  isLoadingCategories: false,
-  isLoadingImagemOculta: false,
-  isLoadingConexao: false, // Adicionado conforme a nova interface
-  selectedImagemOcultaItem: null,
-  selectedConexaoItem: null, // Adicionado conforme a nova interface
-};
+      categories: [],
+      imagemOcultaItems: [],
+      conexaoItems: [],
+      bugWords: [], // Adicionado
+      bugBoards: [], // Adicionado
+      isLoadingCategories: false,
+      isLoadingImagemOculta: false,
+      isLoadingConexao: false,
+      isLoadingBugWords: false, // Adicionado
+      isLoadingBugBoards: false, // Adicionado
+      selectedImagemOcultaItem: null,
+      selectedConexaoItem: null,
+      selectedBugWord: null, // Adicionado
+      selectedBugBoard: null, // Adicionado
+  };
 
 export const adminStore = reactive<AdminState>({ ...initialState });
 

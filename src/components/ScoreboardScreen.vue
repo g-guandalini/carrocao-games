@@ -36,7 +36,7 @@ export default defineComponent({
     }
   },
   emits: ['next-round', 'reset-game', 'exit-scoreboard'],
-  setup(props, { emit }) {
+  setup(_props, { emit }) {
     const scoresFromStore = computed(() => scoreStore.score);
 
     // Propriedade computada para ordenar os scores para exibição de ranking
@@ -51,7 +51,7 @@ export default defineComponent({
       // Transforma o objeto { NomeEquipe: Pontuacao } em um array de objetos { name: NomeEquipe, score: Pontuacao }
       const scoreArray: ScoreItem[] = Object.keys(rawScores).map(teamName => ({
         name: teamName,
-        score: rawScores[teamName]
+        score: rawScores[teamName as keyof typeof rawScores]
       }));
 
       // Ordena o array em ordem decrescente com base na propriedade 'score'

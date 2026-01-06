@@ -3,12 +3,15 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import SplashScreen from '../components/SplashScreen.vue';
 import ImagemOcultaView from '../views/ImagemOcultaView.vue';
 import ConexaoView from '../views/ConexaoView.vue';
-import BugView from '../views/BugView.vue'; // Importe a view do jogo BUG
+import BugView from '../views/BugView.vue';
 
 import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import CategoryManagement from '../views/admin/CategoryManagement.vue';
 import ImagemOcultaManagement from '../views/admin/ImagemOcultaManagement.vue';
 import ConexaoManagement from '../views/admin/ConexaoManagement.vue';
+import BugWordsManagement from '../views/admin/BugWordsManagement.vue';
+import BugBoardsManagement from '../views/admin/BugBoardsManagement.vue';
+import ScoreManagement from '../views/admin/ScoreManagement.vue'; // Importar ScoreManagement
 
 
 const routes: Array<RouteRecordRaw> = [
@@ -22,13 +25,11 @@ const routes: Array<RouteRecordRaw> = [
     name: 'ImagemOcultaGame',
     component: ImagemOcultaView,
   },
-  // Rota para o jogo Conexão
   {
     path: '/conexao',
     name: 'ConexaoGame',
     component: ConexaoView,
   },
-  // NOVA ROTA PARA O JOGO BUG
   {
     path: '/bug',
     name: 'BugGame',
@@ -65,6 +66,30 @@ const routes: Array<RouteRecordRaw> = [
         component: ConexaoManagement,
         meta: {
             title: 'Gerenciar Conexões'
+        }
+      },
+      {
+        path: 'bug-words',
+        name: 'AdminBugWords',
+        component: BugWordsManagement,
+        meta: {
+            title: 'Gerenciar Palavras BUG'
+        }
+      },
+      {
+        path: 'bug-boards',
+        name: 'AdminBugBoards',
+        component: BugBoardsManagement,
+        meta: {
+            title: 'Gerenciar Tabuleiros BUG'
+        }
+      },
+      {
+        path: 'scores', // NOVA ROTA
+        name: 'AdminScores',
+        component: ScoreManagement,
+        meta: {
+            title: 'Gerenciar Pontuações'
         }
       },
     ],

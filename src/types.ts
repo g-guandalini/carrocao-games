@@ -167,23 +167,30 @@ export interface ConexaoGameState {
 //            NOVA INTERFACE: BugGameState
 // =========================================================
 export interface BugGameState {
+  gameStatus: GameStatus;
+  teamsOrder: TeamColor[]; // Adicionado
+  currentTurnIndex: number; // Adicionado
+  currentTurnTeam: TeamColor | null; // A equipe cuja vez é de sortear
+  availableWords: BugWord[]; // Renomeado de bugWords
+  availableBoards: BugBoard[]; // Renomeado de bugBoards
   currentRoundWord: BugWord | null;
   currentBugBoard: BugBoard | null; // O tabuleiro selecionado para a rodada
-  gameStatus: GameStatus;
-  currentTurnTeam: TeamColor | null; // A equipe cuja vez é de sortear
+  disabledTeamsForRound: Set<TeamColor>; // Times desabilitados APENAS para a rodada atual
+  disabledTeamsForGuessing: Set<TeamColor>; // Adicionado
+  revealedBoardTiles: Set<string>; // 'row-col' para os tiles já revelados no tabuleiro
   guessingTeam: TeamColor | null; // A equipe que apertou o botão e está adivinhando
-  bugWords: BugWord[];
-  bugBoards: BugBoard[];
+  wordPhaseAttempts: number; // Adicionado
+  selectedLotteryOption: string | null; // Renomeado de selectedRoundOption
+  wordScoreValue: number | null; // Adicionado
+  roundOptions: string[]; // Opções sorteadas para a equipe da vez (Ganhe 20, Perca 20, etc.)
+  awaitingTileConfirmation: boolean; // Adicionado
+  isInitializing: boolean; // Adicionado
   isLoadingBugWords: boolean;
   isLoadingBugBoards: boolean;
+  isUpdatingScore: boolean; // Adicionado
   playedBugWordIds: string[];
   allCategories: Category[];
   activeBugCategoryIds: number[]; // Categorias ativas para as palavras BUG
-  disabledTeamsForRound: Set<TeamColor>; // Times desabilitados APENAS para a rodada atual
-  roundOptions: string[]; // Opções sorteadas para a equipe da vez (Ganhe 20, Perca 20, etc.)
-  selectedRoundOption: string | null; // Opção escolhida pela equipe
-  revealedBoardTiles: Set<string>; // 'row-col' para os tiles já revelados no tabuleiro
-  // Adicione outras propriedades de estado conforme a complexidade do jogo exigir
 }
 // =========================================================
 //            FIM DA NOVA INTERFACES PARA BUG

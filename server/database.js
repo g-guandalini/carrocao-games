@@ -226,15 +226,25 @@ async function createTables() {
         console.log('Tabela "category_bug_words" criada ou já existe.');
 
         // Tabela bug_boards
-        // A configuração do tabuleiro será salva como uma string JSON
         await runAsync(`
             CREATE TABLE IF NOT EXISTS bug_boards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
-                board_config TEXT NOT NULL
+                board_config TEXT NOT NULL,
+                selected INTEGER DEFAULT 0 -- NOVA COLUNA AQUI
             );
         `);
         console.log('Tabela "bug_boards" criada ou já existe.');
+
+        // Lógica de Migração: Verifica e adiciona a coluna 'selected' se ela não existir para bug_boards
+        let bugBoardsTableInfo = await allAsync("PRAGMA table_info(bug_boards)");
+        let hasSelectedColumnBugBoards = bugBoardsTableInfo.some(col => col.name === 'selected');
+
+        if (!hasSelectedColumnBugBoards) {
+            console.log('Coluna "selected" não encontrada na tabela "bug_boards". Adicionando...');
+            await runAsync("ALTER TABLE bug_boards ADD COLUMN selected INTEGER DEFAULT 0");
+            console.log('Coluna "selected" adicionada com sucesso à tabela "bug_boards".');
+        }
 
         // =========================================================
         //            FIM DAS NOVAS TABELAS PARA BUG
@@ -395,23 +405,23 @@ async function seedInitialData() {
     const ALL_BUG_BOARDS = [
         {
             name: 'Tabuleiro Padrão',
-            // Matriz 4x5 (4 linhas, 5 colunas) ou 5x4 (5 linhas, 4 colunas) para 20 quadros
-            // Usaremos 5 linhas e 4 colunas para simplificar visualmente o acesso no frontend (row, col)
             board_config: JSON.stringify([
                 [10, 20, 'Bug', 30, 20],
                 [20, 'Carroção', 10, 20, 20],
                 [30, 10, 20, 'Bug', 20],
                 ['Carroção', 20, 30, 10, 20]
-            ])
+            ]),
+            selected: 1 // Definir o primeiro como selecionado
         },
         {
             name: 'Tabuleiro Fácil',
             board_config: JSON.stringify([
-                [10, 20, 'Bug', 30, 20],
-                [20, 'Carroção', 10, 20, 20],
-                [30, 10, 20, 'Bug', 20],
-                ['Carroção', 20, 30, 10, 20]
-            ])
+                [10, 10, 'Bug', 10, 10],
+                [10, 'Carroção', 10, 10, 10],
+                [10, 10, 10, 'Bug', 10],
+                ['Carroção', 10, 10, 10, 10]
+            ]),
+            selected: 0
         },
     ];
 
@@ -419,11 +429,23 @@ async function seedInitialData() {
     if (bugBoardCountRow && bugBoardCountRow.count === 0) {
         console.log('Populando "bug_boards" com dados iniciais...');
         for (const board of ALL_BUG_BOARDS) {
-            await runAsync("INSERT INTO bug_boards (name, board_config) VALUES (?, ?)", [board.name, board.board_config]);
+            await runAsync("INSERT INTO bug_boards (name, board_config, selected) VALUES (?, ?, ?)", [board.name, board.board_config, board.selected]);
         }
         console.log('Dados iniciais de bug_boards inseridos com sucesso.');
     } else {
         console.log('Tabela "bug_boards" já contém dados. Ignorando seeding.');
+        // Garante que apenas um esteja selecionado se já houver dados
+        const selectedBoards = await allAsync("SELECT id FROM bug_boards WHERE selected = 1");
+        if (selectedBoards.length === 0 && bugBoardCountRow.count > 0) {
+            // Se nenhum estiver selecionado, seleciona o primeiro
+            await runAsync("UPDATE bug_boards SET selected = 1 WHERE id = (SELECT MIN(id) FROM bug_boards)");
+            console.log('Nenhum tabuleiro BUG estava selecionado, o primeiro foi definido como selecionado.');
+        } else if (selectedBoards.length > 1) {
+            // Se mais de um estiver selecionado, deseleciona todos exceto o primeiro encontrado
+            const firstSelectedId = selectedBoards[0].id;
+            await runAsync("UPDATE bug_boards SET selected = 0 WHERE id != ?", [firstSelectedId]);
+            console.log('Mais de um tabuleiro BUG estava selecionado, corrigido para apenas um.');
+        }
     }
 
     // =========================================================

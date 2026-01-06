@@ -55,7 +55,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['tile-selected', 'confirm-board-action'],
+  emits: ['tile-selected', 'confirm-board-action', 'start-new-round-shortcut', 'view-scoreboard-shortcut'], // ADICIONADOS NOVOS EMITS
   setup(props, { emit }) {
     const getTeamClass = (team: TeamColor) => {
       switch (team) {
@@ -107,16 +107,21 @@ export default defineComponent({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Funcionalidade existente da barra de espaço para confirmação
-      if (event.key === ' ' && props.awaitingTileConfirmation) {
-        event.preventDefault(); // Previne o scroll da página
-        emit('confirm-board-action');
-        clearFirstKey(); // Limpa qualquer primeira tecla pendente
-        return;
-      }
-
-      // Se estiver aguardando confirmação, impede outras teclas de selecionar tiles
+      // NOVO: Lógica para barra de espaço e 'P' quando awaitingTileConfirmation é true
       if (props.awaitingTileConfirmation) {
+        if (event.key === ' ') {
+          event.preventDefault(); // Previne o scroll da página
+          emit('start-new-round-shortcut'); // Emite o novo evento para iniciar nova rodada
+          clearFirstKey();
+          return;
+        } else if (event.key.toLowerCase() === 'p') {
+          event.preventDefault(); // Previne ação padrão da tecla 'P'
+          emit('view-scoreboard-shortcut'); // Emite o novo evento para ir ao placar
+          clearFirstKey();
+          return;
+        }
+        // Se estiver aguardando confirmação, impede outras teclas de selecionar tiles
+        // e a lógica original de 'confirm-board-action' pela barra de espaço foi removida
         clearFirstKey();
         return;
       }

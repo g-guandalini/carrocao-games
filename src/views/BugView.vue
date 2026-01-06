@@ -1,3 +1,4 @@
+BugView.vue
 <template>
   <div class="game-page-container bug-game">
     <GameHeader />
@@ -59,6 +60,8 @@
           :awaitingTileConfirmation="bugStore.awaitingTileConfirmation"
           @tile-selected="handleTileSelected"
           @confirm-board-action="confirmBoardAction"
+          @start-new-round-shortcut="handleStartNewRoundShortcut"
+          @view-scoreboard-shortcut="handleViewScoreboardShortcut"
         ></BugBoardPhase>
       </div>
     </div>
@@ -67,9 +70,9 @@
 
 <script lang="ts">
 import { defineComponent, onMounted, computed, watch } from 'vue';
-import { bugStore, initializeBugGame, startNewCleanBugRound, selectLotteryOption, setGuessingTeam, handleOperatorBugFeedback, selectBoardTile, confirmTileAction, viewBugScoreboard, selectTeamToRemove, currentWordPotentialScore } from '../store/bugStore';
+import { bugStore, initializeBugGame, startNewCleanBugRound, selectLotteryOption, setGuessingTeam, handleOperatorBugFeedback, selectBoardTile, confirmTileAction, viewBugScoreboard, selectTeamToRemove } from '../store/bugStore'; // currentWordPotentialScore removido
 import { scoreStore, fetchScores } from '../store/scoreStore';
-import { TeamColor, GameStatus } from '../types';
+import { TeamColor } from '../types'; // GameStatus removido
 import ScoreboardScreen from '../components/ScoreboardScreen.vue';
 import BugDrawPhase from '../components/BugDrawPhase.vue';
 import BugWordPhase from '../components/BugWordPhase.vue';
@@ -161,7 +164,23 @@ export default defineComponent({
       confirmTileAction();
     };
 
-    watch(() => bugStore.gameStatus, (newStatus, oldStatus) => {
+    // NOVO: Lógica para atalho de iniciar nova rodada
+    const handleStartNewRoundShortcut = async () => {
+      if (bugStore.awaitingTileConfirmation) {
+        await confirmTileAction(); // Garante que o tile pendente seja processado
+      }
+      await startNewRound(); // Inicia uma nova rodada
+    };
+
+    // NOVO: Lógica para atalho de ir para o placar
+    const handleViewScoreboardShortcut = async () => {
+      if (bugStore.awaitingTileConfirmation) {
+        await confirmTileAction(); // Garante que o tile pendente seja processado
+      }
+      await viewBugScoreboard(); // Vai para o placar
+    };
+
+    watch(() => bugStore.gameStatus, (_newStatus, _oldStatus) => { // Parâmetros prefixados com _
       // Logs de status de jogo removidos
     });
 
@@ -172,7 +191,7 @@ export default defineComponent({
       handleResetGame,
       handleExitScoreboard,
       scrambledWordComputed,
-      combinedDisabledTeamsForWordPhase, // EXPOR A NOVA PROPRIEDADE COMPUTADA
+      combinedDisabledTeamsForWordPhase,
       handleOptionSelected,
       handleTeamsRemoved,
       setGuessingTeam,
@@ -180,6 +199,8 @@ export default defineComponent({
       handleWrongGuess,
       handleTileSelected,
       confirmBoardAction,
+      handleStartNewRoundShortcut, // EXPOR NOVO MÉTODO
+      handleViewScoreboardShortcut, // EXPOR NOVO MÉTODO
     };
   },
 });

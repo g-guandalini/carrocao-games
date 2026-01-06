@@ -1,12 +1,12 @@
 // src/store/bugStore.ts
 import { reactive, watch, computed } from 'vue';
-import { BugState, TeamColor, GameStatus, BugWord, BugBoard, BoardValue } from '../types';
-import { updateScore, setScore, fetchScores } from './scoreStore'; // fetchScores ainda é importado para chamadas iniciais
+import { BugGameState, TeamColor, GameStatus, BugWord, BugBoard } from '../types';
+import { updateScore, setScore } from './scoreStore';
 
 const LOCAL_STORAGE_KEY = 'bugCurrentRoundState';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-const initialBugState: BugState = {
+const initialBugState: BugGameState = { // Usando BugGameState
   gameStatus: 'idle', // 'idle', 'bug_draw_phase', 'bug_word_phase', 'bug_board_phase', 'scoreboard'
   teamsOrder: [TeamColor.RED, TeamColor.BLUE, TeamColor.GREEN, TeamColor.YELLOW],
   currentTurnIndex: 0, // Inicia com o time vermelho (TeamColor.RED)
@@ -28,9 +28,13 @@ const initialBugState: BugState = {
   isLoadingBugWords: false, // Estado de carregamento para palavras
   isLoadingBugBoards: false, // Estado de carregamento para tabuleiros
   isUpdatingScore: false, // NOVO: Flag para prevenir atualizações de pontuação duplicadas
+  // PROPRIEDADES FALTANTES ADICIONADAS AQUI:
+  playedBugWordIds: [],
+  allCategories: [],
+  activeBugCategoryIds: [],
 };
 
-export const bugStore = reactive<BugState>({ ...initialBugState });
+export const bugStore = reactive<BugGameState>({ ...initialBugState });
 
 // Helper para centralizar e logar todas as mudanças de gameStatus
 function setGameStatus(newStatus: GameStatus) {
@@ -118,30 +122,41 @@ async function fetchBugBoardsFromApi(): Promise<BugBoard[]> {
 }
 
 async function selectRandomWordAndBoard() {
-  // Recarrega as palavras se não houver nenhuma disponível ou se todas já foram usadas
+  // Recarrega as palavras se não houver nenhuma disponível
   if (bugStore.availableWords.length === 0) {
     bugStore.availableWords = await fetchBugWordsFromApi();
-    // Adiciona aqui a lógica para reembaralhar ou resetar as palavras se for o caso
   }
-  if (bugStore.availableBoards.length === 0) {
-    bugStore.availableBoards = await fetchBugBoardsFromApi();
-    // Adiciona aqui a lógica para reembaralhar ou resetar os tabuleiros se for o caso
-  }
-
+  
   if (bugStore.availableWords.length > 0) {
     const randomIndex = Math.floor(Math.random() * bugStore.availableWords.length);
     bugStore.currentRoundWord = bugStore.availableWords[randomIndex];
     // bugStore.availableWords.splice(randomIndex, 1); // Descomente se quiser remover palavras usadas para não repetir na mesma sessão
   } else {
     bugStore.currentRoundWord = null;
+    console.warn('DEBUG: Nenhuma palavra BUG disponível para o jogo.');
+  }
+
+  // --- Lógica para selecionar o tabuleiro ativo ---
+  if (bugStore.availableBoards.length === 0) {
+    // Se não há tabuleiros disponíveis, tenta buscar novamente
+    bugStore.availableBoards = await fetchBugBoardsFromApi();
   }
 
   if (bugStore.availableBoards.length > 0) {
-    const randomIndex = Math.floor(Math.random() * bugStore.availableBoards.length);
-    bugStore.currentBugBoard = bugStore.availableBoards[randomIndex];
-    // bugStore.availableBoards.splice(randomIndex, 1); // Descomente se quiser remover tabuleiros usados para não repetir na mesma sessão
+    // Corrigido: Assumindo que 'selected' é uma propriedade que pode vir da API ou ser adicionada.
+    // Se 'selected' não for parte da interface BugBoard, esta linha pode precisar de ajuste na API ou no tipo BugBoard.
+    const selectedBoard = bugStore.availableBoards.find((board: BugBoard & { selected?: number }) => board.selected === 1);
+    if (selectedBoard) {
+      bugStore.currentBugBoard = selectedBoard;
+      console.log('DEBUG: Tabuleiro BUG ativo carregado:', selectedBoard.name);
+    } else {
+      // Fallback: se nenhum estiver explicitamente selecionado, usa o primeiro
+      bugStore.currentBugBoard = bugStore.availableBoards[0];
+      console.warn('DEBUG: Nenhum tabuleiro BUG estava marcado como ativo. Usando o primeiro tabuleiro encontrado como padrão:', bugStore.currentBugBoard.name);
+    }
   } else {
     bugStore.currentBugBoard = null;
+    console.error('DEBUG: Nenhuma tabuleiro BUG disponível para o jogo.');
   }
 }
 
@@ -153,7 +168,7 @@ export async function initializeBugGame() {
     loadBugState(); // Carrega qualquer estado existente do localStorage primeiro
     // Se o jogo está começando do zero (sem estado salvo ou gameStatus 'idle'),
     // garanta que as pontuações iniciais sejam definidas.
-    if (bugStore.gameStatus === 'idle' && bugStore.currentTurnTeam === null) {
+    if (bugStore.gameStatus === 'idle' || bugStore.currentTurnTeam === null) {
       for (const team of bugStore.teamsOrder) {
         await setScore(team, 100); // scoreStore.setScore já chama fetchScores()
       }
@@ -221,12 +236,12 @@ export async function startNewCleanBugRound() {
   bugStore.wordPhaseAttempts = 0;
   bugStore.selectedLotteryOption = null;
   bugStore.wordScoreValue = null;
-  bugStore.currentBugBoard = null;
+  bugStore.currentBugBoard = null; // Limpa o tabuleiro atual para que selectRandomWordAndBoard possa definir o ativo
   bugStore.currentRoundWord = null;
   bugStore.awaitingTileConfirmation = false;
 
   // 3. Seleciona nova palavra e tabuleiro para a nova rodada
-  await selectRandomWordAndBoard();
+  await selectRandomWordAndBoard(); // Isso garantirá que o tabuleiro ativo seja carregado
 
   // 4. Transiciona para a fase de sorteio da nova rodada.
   setGameStatus('bug_draw_phase'); // Usa helper
@@ -269,7 +284,7 @@ export async function selectLotteryOption(option: string, chosenPoints?: number)
       case 'Tire uma':
       case 'Tire duas':
         // Calcula os times que *ainda não estão desabilitados por sorteio*
-        const currentlyEligibleForLottery = bugStore.teamsOrder.filter(t => !bugStore.disabledTeamsForRound.has(t));
+        const currentlyEligibleForLottery = bugStore.teamsOrder.filter((t: TeamColor) => !bugStore.disabledTeamsForRound.has(t)); // Tipado 't'
         const teamsToRemain = currentlyEligibleForLottery.length - (option === 'Tire uma' ? 1 : 2);
 
         if (teamsToRemain <= 0) { // Se não sobrarem times para jogar
@@ -327,12 +342,12 @@ export async function handleOperatorBugFeedback(isCorrect: boolean, team: TeamCo
 
     // 1. Identifica os times que são elegíveis para adivinhar nesta rodada (não desabilitados por sorteio)
     const teamsEligibleAtStartOfWordPhase = bugStore.teamsOrder.filter(
-      t => !bugStore.disabledTeamsForRound.has(t)
+      (t: TeamColor) => !bugStore.disabledTeamsForRound.has(t) // Tipado 't'
     );
 
     // 2. Verifica se todos esses times elegíveis já erraram (estão em disabledTeamsForGuessing)
     const allEligibleTeamsHaveGuessedAndFailed = teamsEligibleAtStartOfWordPhase.every(
-      t => bugStore.disabledTeamsForGuessing.has(t)
+      (t: TeamColor) => bugStore.disabledTeamsForGuessing.has(t) // Tipado 't'
     );
 
     if (allEligibleTeamsHaveGuessedAndFailed && teamsEligibleAtStartOfWordPhase.length > 0) {
@@ -346,7 +361,7 @@ export async function handleOperatorBugFeedback(isCorrect: boolean, team: TeamCo
       // Se ainda há times elegíveis que não erraram, o jogo continua na fase da palavra.
       // Apenas para garantir, verifica se ainda há *qualquer* time que possa adivinhar.
       const anyTeamCanStillGuess = teamsEligibleAtStartOfWordPhase.some(
-        t => !bugStore.disabledTeamsForGuessing.has(t)
+        (t: TeamColor) => !bugStore.disabledTeamsForGuessing.has(t) // Tipado 't'
       );
 
       if (!anyTeamCanStillGuess) {

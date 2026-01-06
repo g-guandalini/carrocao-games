@@ -6,7 +6,7 @@
       <!-- Condição ajustada para que o grid de opções fique visível durante a animação de sorteio e o destaque pós-sorteio -->
       <div v-if="!selectedOption || highlightedOption" class="options-grid">
         <button
-          v-for="(option, index) in orderedRoundOptions"
+          v-for="(option, _index) in orderedRoundOptions"
           :key="option"
           :class="['option-button', getOptionClass(option), {'drawing': isDrawing && currentDrawingOption === option}]"
           :disabled="true"

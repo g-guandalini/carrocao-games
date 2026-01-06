@@ -27,15 +27,29 @@ router.get('/bug/words', async (req, res) => {
     try {
         let sql = "SELECT bw.* FROM bug_words bw";
         const params = [];
-        const categoryIdsQuery = req.query.categoryIds;
+        let categoryIdsToFilter = [];
 
-        if (categoryIdsQuery) {
-            const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
-            if (ids.length > 0) {
-                sql += " INNER JOIN category_bug_words cbw ON bw.id = cbw.bug_word_id WHERE cbw.category_id IN (" + ids.map(() => '?').join(',') + ")";
-                params.push(...ids);
-                sql += " GROUP BY bw.id"; // Agrupar para evitar palavras duplicadas se pertencerem a múltiplas categorias selecionadas
+        // 1. Verificar se há categorias com bug_start = 1
+        const bugStartCategories = await allAsync("SELECT id FROM categories WHERE bug_start = 1");
+
+        if (bugStartCategories.length > 0) {
+            // Se existirem categorias com bug_start = 1, use-as como filtro principal
+            categoryIdsToFilter = bugStartCategories.map(cat => cat.id);
+        } else {
+            // Se não houver categorias com bug_start = 1, verifique categoryIds na query
+            const categoryIdsQuery = req.query.categoryIds;
+            if (categoryIdsQuery) {
+                const ids = String(categoryIdsQuery).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+                if (ids.length > 0) {
+                    categoryIdsToFilter = ids;
+                }
             }
+        }
+
+        if (categoryIdsToFilter.length > 0) {
+            sql += " INNER JOIN category_bug_words cbw ON bw.id = cbw.bug_word_id WHERE cbw.category_id IN (" + categoryIdsToFilter.map(() => '?').join(',') + ")";
+            params.push(...categoryIdsToFilter);
+            sql += " GROUP BY bw.id"; // Agrupar para evitar palavras duplicadas se pertencerem a múltiplas categorias selecionadas
         }
         
         sql += " ORDER BY bw.order_idx IS NULL, bw.order_idx ASC, bw.id ASC";
@@ -49,9 +63,10 @@ router.get('/bug/words', async (req, res) => {
 });
 
 // GET all bug boards (para o jogo, para selecionar um)
+// Inclui a coluna 'selected'
 router.get('/bug/boards', async (req, res) => {
     try {
-        const bugBoards = await allAsync("SELECT id, name, board_config FROM bug_boards");
+        const bugBoards = await allAsync("SELECT id, name, board_config, selected FROM bug_boards");
         // Faz o parse da string JSON 'board_config' para um objeto JavaScript
         const formattedBoards = bugBoards.map(board => ({
             ...board,
@@ -209,10 +224,10 @@ router.delete('/admin/bug/words/:id', async (req, res) => {
     }
 });
 
-// GET all bug boards for admin
+// GET all bug boards for admin (inclui 'selected')
 router.get('/admin/bug/boards', async (req, res) => {
     try {
-        const bugBoards = await allAsync("SELECT id, name, board_config FROM bug_boards");
+        const bugBoards = await allAsync("SELECT id, name, board_config, selected FROM bug_boards");
         const formattedBoards = bugBoards.map(board => ({
             ...board,
             board_config: JSON.parse(board.board_config) // Faz o parse de volta
@@ -224,10 +239,10 @@ router.get('/admin/bug/boards', async (req, res) => {
     }
 });
 
-// GET a specific bug board for admin
+// GET a specific bug board for admin (inclui 'selected')
 router.get('/admin/bug/boards/:id', async (req, res) => {
     try {
-        const board = await getAsync("SELECT id, name, board_config FROM bug_boards WHERE id = ?", [req.params.id]);
+        const board = await getAsync("SELECT id, name, board_config, selected FROM bug_boards WHERE id = ?", [req.params.id]);
         if (board) {
             res.json({
                 ...board,
@@ -259,9 +274,13 @@ router.post('/admin/bug/boards', async (req, res) => {
     }
 
     try {
-        const result = await runAsync("INSERT INTO bug_boards (name, board_config) VALUES (?, ?)", [processedName, stringifiedBoardConfig]);
-        res.status(201).json({ id: result.lastID, name: processedName, board_config }); // Retorna a configuração como objeto
+        await runAsync("BEGIN TRANSACTION");
+        // Por padrão, um novo tabuleiro não é selecionado, a menos que seja explicitamente definido por outra rota
+        const result = await runAsync("INSERT INTO bug_boards (name, board_config, selected) VALUES (?, ?, 0)", [processedName, stringifiedBoardConfig]);
+        await runAsync("COMMIT");
+        res.status(201).json({ id: result.lastID, name: processedName, board_config, selected: 0 }); // Retorna a configuração como objeto
     } catch (dbErr) {
+        await runAsync("ROLLBACK");
         console.error('Erro ao criar Tabuleiro BUG no DB:', dbErr);
         if (dbErr.code === 'SQLITE_CONSTRAINT' && dbErr.message.includes('UNIQUE constraint failed: bug_boards.name')) {
             return res.status(409).json({ error: `Um tabuleiro com o nome '${processedName}' já existe.` });
@@ -273,7 +292,7 @@ router.post('/admin/bug/boards', async (req, res) => {
 // PUT (update) an existing bug board
 router.put('/admin/bug/boards/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, board_config } = req.body || {};
+    const { name, board_config } = req.body || {}; // 'selected' não é atualizado por aqui, apenas pela rota dedicada
     const processedName = (name || '').trim();
 
     if (!processedName || !board_config) {
@@ -288,15 +307,21 @@ router.put('/admin/bug/boards/:id', async (req, res) => {
     }
 
     try {
+        await runAsync("BEGIN TRANSACTION");
         const result = await runAsync(
             "UPDATE bug_boards SET name = ?, board_config = ? WHERE id = ?",
             [processedName, stringifiedBoardConfig, id]
         );
         if (result.changes === 0) {
+            await runAsync("ROLLBACK");
             return res.status(404).json({ message: 'Tabuleiro BUG não encontrado.' });
         }
-        res.json({ message: 'Tabuleiro BUG atualizado com sucesso.', id, name: processedName, board_config });
+        // Recupera o status 'selected' atual para retornar na resposta
+        const updatedBoard = await getAsync("SELECT selected FROM bug_boards WHERE id = ?", [id]);
+        await runAsync("COMMIT");
+        res.json({ message: 'Tabuleiro BUG atualizado com sucesso.', id, name: processedName, board_config, selected: updatedBoard.selected });
     } catch (dbErr) {
+        await runAsync("ROLLBACK");
         console.error('Erro ao atualizar Tabuleiro BUG no DB:', dbErr);
         if (dbErr.code === 'SQLITE_CONSTRAINT' && dbErr.message.includes('UNIQUE constraint failed: bug_boards.name')) {
             return res.status(409).json({ error: `Um tabuleiro com o nome '${processedName}' já existe.` });
@@ -305,15 +330,47 @@ router.put('/admin/bug/boards/:id', async (req, res) => {
     }
 });
 
+// NOVA ROTA: Definir um tabuleiro como selecionado e desmarcar os outros
+router.put('/admin/bug/boards/:id/select', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await runAsync("BEGIN TRANSACTION");
+        // 1. Desmarcar todos os outros tabuleiros
+        await runAsync("UPDATE bug_boards SET selected = 0 WHERE id != ?", [id]);
+
+        // 2. Marcar o tabuleiro especificado como selecionado
+        const result = await runAsync("UPDATE bug_boards SET selected = 1 WHERE id = ?", [id]);
+
+        if (result.changes === 0) {
+            await runAsync("ROLLBACK");
+            return res.status(404).json({ message: 'Tabuleiro BUG não encontrado para seleção.' });
+        }
+        await runAsync("COMMIT");
+        res.json({ message: `Tabuleiro BUG com ID ${id} definido como ativo.`, id });
+    } catch (err) {
+        await runAsync("ROLLBACK");
+        console.error('Erro ao definir tabuleiro BUG como selecionado:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // DELETE a bug board
 router.delete('/admin/bug/boards/:id', async (req, res) => {
     try {
+        await runAsync("BEGIN TRANSACTION");
         const result = await runAsync("DELETE FROM bug_boards WHERE id = ?", [req.params.id]);
         if (result.changes === 0) {
+            await runAsync("ROLLBACK");
             return res.status(404).json({ error: 'Tabuleiro BUG não encontrado.' });
         }
+        // Se o tabuleiro excluído era o único selecionado, o sistema deve lidar com isso (ex: selecionar outro aleatoriamente ou deixar sem nenhum)
+        // Por simplicidade, não faremos uma seleção automática aqui, mas é um ponto a considerar.
+        await runAsync("COMMIT");
         res.json({ message: 'Tabuleiro BUG excluído com sucesso.' });
     } catch (err) {
+        await runAsync("ROLLBACK");
         console.error('Erro ao excluir Tabuleiro BUG:', err);
         res.status(500).json({ error: err.message });
     }

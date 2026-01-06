@@ -83,7 +83,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['option-selected', 'teams-removed'],
+  emits: ['option-selected', 'teams-removed', 'start-new-round-shortcut', 'view-scoreboard-shortcut', 'option-confirmed-and-next-action'],
   setup(props, { emit }) {
     const selectedOption = ref<string | null>(null);
     const highlightedOption = ref<string | null>(null);
@@ -341,35 +341,45 @@ export default defineComponent({
         return;
       }
 
-      if (event.code === 'Space') {
-        event.preventDefault();
-
+      if (selectedOption.value) {
         if (selectedOption.value === '10 a 50') {
-          confirmPoints();
-        } else if (selectedOption.value === 'Tire uma' || selectedOption.value === 'Tire duas') {
-          const limit = selectedOption.value === 'Tire uma' ? 1 : 2;
-          if (selectedTeamsToRemove.value.length === limit) {
-            confirmTeamRemoval();
+          const points = pointKeyMap[event.key];
+          if (points) {
+            event.preventDefault();
+            togglePointSelection(points);
+          } else if (event.code === 'Space') {
+            event.preventDefault();
+            confirmPoints();
           }
-        } else if (selectedOption.value) {
-          confirmDrawnOption();
+        } else if (selectedOption.value === 'Tire uma' || selectedOption.value === 'Tire duas') {
+          const team = teamKeyMap[event.key];
+          if (team) {
+            event.preventDefault();
+            toggleTeamSelection(team);
+          } else if (event.code === 'Space') {
+            event.preventDefault();
+            const limit = selectedOption.value === 'Tire uma' ? 1 : 2;
+            if (selectedTeamsToRemove.value.length === limit) {
+              confirmTeamRemoval();
+            }
+          }
+        } else if (selectedOption.value === 'Ganhe 20' || selectedOption.value === 'Perca 20') {
+          if (event.code === 'Space') {
+            event.preventDefault();
+            // Emite um evento combinado para aplicar pontos e iniciar nova rodada
+            emit('option-confirmed-and-next-action', selectedOption.value, chosenPoints.value, 'newRound');
+          } else if (event.key === 'p' || event.key === 'P') {
+            event.preventDefault();
+            // Emite um evento combinado para aplicar pontos e ir para o placar
+            emit('option-confirmed-and-next-action', selectedOption.value, chosenPoints.value, 'scoreboard');
+          }
+        } else { // Cobre 'Fora' e outras opções simples que só precisam de ESPAÇO para confirmar
+          if (event.code === 'Space') {
+            event.preventDefault();
+            confirmDrawnOption();
+          }
         }
-      }
-      else if (selectedOption.value === 'Tire uma' || selectedOption.value === 'Tire duas') {
-        const team = teamKeyMap[event.key];
-        if (team) {
-          event.preventDefault();
-          toggleTeamSelection(team);
-        }
-      }
-      else if (selectedOption.value === '10 a 50') {
-        const points = pointKeyMap[event.key];
-        if (points) {
-          event.preventDefault();
-          togglePointSelection(points);
-        }
-      }
-      else if (!selectedOption.value) {
+      } else { // Nenhuma opção selecionada ainda, fase de sorteio inicial
         if (event.key === 's' || event.key === 'S') {
           drawRandomOption();
         } else {
@@ -642,7 +652,6 @@ export default defineComponent({
   background-color: #e74c3c;
   color: white;
   border: 0.6vh solid #f39c12;
-  transform: scale(1.05);
   box-shadow: 0 0.8vh 1.5vh rgba(0, 0, 0, 0.4);
   z-index: 2;
   position: relative;

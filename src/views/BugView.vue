@@ -1,4 +1,3 @@
-BugView.vue
 <template>
   <div class="game-page-container bug-game">
     <GameHeader />
@@ -39,6 +38,9 @@ BugView.vue
           :disabledTeams="bugStore.disabledTeamsForRound" 
           @option-selected="handleOptionSelected"
           @teams-removed="handleTeamsRemoved"
+          @start-new-round-shortcut="handleStartNewRoundShortcut"
+          @view-scoreboard-shortcut="handleViewScoreboardShortcut"
+          @option-confirmed-and-next-action="handleOptionConfirmedAndNextAction"
         />
 
         <BugWordPhase
@@ -164,7 +166,7 @@ export default defineComponent({
       confirmTileAction();
     };
 
-    // NOVO: Lógica para atalho de iniciar nova rodada
+    // Lógica para atalho de iniciar nova rodada
     const handleStartNewRoundShortcut = async () => {
       if (bugStore.awaitingTileConfirmation) {
         await confirmTileAction(); // Garante que o tile pendente seja processado
@@ -172,12 +174,25 @@ export default defineComponent({
       await startNewRound(); // Inicia uma nova rodada
     };
 
-    // NOVO: Lógica para atalho de ir para o placar
+    // Lógica para atalho de ir para o placar
     const handleViewScoreboardShortcut = async () => {
       if (bugStore.awaitingTileConfirmation) {
         await confirmTileAction(); // Garante que o tile pendente seja processado
       }
       await viewBugScoreboard(); // Vai para o placar
+    };
+
+    // NOVO: Handler para o evento combinado de opção confirmada e próxima ação
+    const handleOptionConfirmedAndNextAction = async (option: string, chosenPoints: number, nextAction: 'newRound' | 'scoreboard') => {
+      // 1. Aplica os pontos (esta chamada pode, dependendo da implementação do store, definir o gameStatus para 'scoreboard' brevemente)
+      await selectLotteryOption(option, chosenPoints);
+
+      // 2. Imediatamente executa a próxima ação desejada para sobrescrever qualquer estado intermediário
+      if (nextAction === 'newRound') {
+        await startNewCleanBugRound();
+      } else if (nextAction === 'scoreboard') {
+        await viewBugScoreboard();
+      }
     };
 
     watch(() => bugStore.gameStatus, (_newStatus, _oldStatus) => { // Parâmetros prefixados com _
@@ -199,8 +214,9 @@ export default defineComponent({
       handleWrongGuess,
       handleTileSelected,
       confirmBoardAction,
-      handleStartNewRoundShortcut, // EXPOR NOVO MÉTODO
-      handleViewScoreboardShortcut, // EXPOR NOVO MÉTODO
+      handleStartNewRoundShortcut,
+      handleViewScoreboardShortcut,
+      handleOptionConfirmedAndNextAction, // EXPOR NOVO MÉTODO
     };
   },
 });

@@ -19,7 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --linux AppImage
+      - run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: linux-installer
@@ -35,7 +35,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --win nsis
+      - run: npx electron-builder --win nsis --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer

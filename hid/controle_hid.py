@@ -37,7 +37,11 @@ def matching_mapping(mappings, identifier, name, input_code):
     exact = [m for m in candidates if m.get("deviceIdentifier") and m["deviceIdentifier"] == identifier]
     if exact:
         return exact[0]
-    named = [m for m in candidates if m.get("deviceName") and m["deviceName"] == name]
+    normalized_name = name.casefold()
+    named = [m for m in candidates if m.get("deviceName") and (
+        normalized_name in m["deviceName"].casefold() or
+        m["deviceName"].casefold() in normalized_name
+    )]
     return named[0] if named else next((m for m in candidates if not m.get("deviceIdentifier") and not m.get("deviceName")), None)
 
 

@@ -68,11 +68,20 @@ app.get('/api/admin/backup', (req, res) => {
     }
 
     const date = new Date().toISOString().slice(0, 10);
-    res.download(databasePath, `carrocao-games-backup-${date}.sqlite`, (error) => {
-        if (error && !res.headersSent) {
+    const filename = `carrocao-games-backup-${date}.sqlite`;
+    res.setHeader('Content-Type', 'application/vnd.sqlite3');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const stream = fs.createReadStream(databasePath);
+    stream.on('error', (error) => {
+        console.error('[Backup] Erro ao ler banco de dados:', error);
+        if (!res.headersSent) {
             res.status(500).json({ error: 'Não foi possível gerar o backup.' });
+        } else {
+            res.destroy(error);
         }
     });
+    stream.pipe(res);
 });
 
 // Suas rotas existentes da API

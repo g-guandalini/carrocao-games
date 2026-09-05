@@ -130,6 +130,21 @@ O menu lateral possui as opções `Backup`, que baixa o banco SQLite atual, e
 `Restaurar`, que permite selecionar um arquivo `.sqlite` ou `.db`. A restauração
 substitui os dados atuais após confirmação e valida o arquivo antes da troca.
 
+### Configuração da botoeira
+
+O menu `Botoeira` permite cadastrar controles e mapear entradas SDL/Pygame para
+teclas do jogo. O controlador unificado está em `hid/controle_hid.py` e lê sua
+configuração pela API local (`/api/hid/config`). Para executá-lo manualmente,
+instale `hid/requirements.txt` e inicie o backend antes:
+
+```bash
+python -m pip install -r hid/requirements.txt
+python hid/controle_hid.py
+```
+
+As entradas de botões usam o formato `button:0`, `button:1` etc. O suporte a
+Xbox e a controles PS2 depende de o dispositivo ser reconhecido pelo SDL.
+
 ## Configurações opcionais da Conexão
 
 Além de `VITE_API_BASE_URL`, é possível configurar a duração da rodada e o intervalo de revelação das letras:

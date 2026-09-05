@@ -14,15 +14,15 @@
         
         <div class="checkbox-group">
           <label>
-            <input type="checkbox" v-model="editingCategory.imagem_oculta_start" />
+            <input type="checkbox" v-model="editingCategory.imagem_oculta_start" :true-value="1" :false-value="0" />
             Selecionar para o jogo Imagem Oculta
           </label>
           <label>
-            <input type="checkbox" v-model="editingCategory.conexao_start" />
+            <input type="checkbox" v-model="editingCategory.conexao_start" :true-value="1" :false-value="0" />
             Selecionar para o jogo Conexão
           </label>
           <label>
-            <input type="checkbox" v-model="editingCategory.bug_start" />
+            <input type="checkbox" v-model="editingCategory.bug_start" :true-value="1" :false-value="0" />
             Selecionar para o jogo Bug
           </label>
         </div>

@@ -12,6 +12,7 @@
 </template>
 
 <script lang="ts">
+import { matchesShortcut } from '../store/shortcutStore';
 import { defineComponent, ref, onMounted, onUnmounted } from 'vue';
 
 export default defineComponent({
@@ -66,10 +67,10 @@ export default defineComponent({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'o' || event.key === 'O') {
+      if (matchesShortcut(event, 'feedback_correct', 'O')) {
         event.preventDefault();
         handleCorrectClick();
-      } else if (event.key === 'x' || event.key === 'X') {
+      } else if (matchesShortcut(event, 'feedback_wrong', 'X')) {
         event.preventDefault();
         handleWrongClick();
       }

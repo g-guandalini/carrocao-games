@@ -3,8 +3,13 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const http = require('node:http');
 
+// O pynput injeta teclas pelo X11. Em sessões Wayland, force o Electron a
+// usar o XWayland para que as teclas da botoeira cheguem à janela do jogo.
+app.commandLine.appendSwitch('ozone-platform', 'x11');
+
 const PORT = Number(process.env.PORT || 3001);
 let backend;
+let hidController;
 
 function serverPath() {
   return path.join(app.getAppPath(), 'server', 'index.js');
@@ -33,6 +38,31 @@ function startBackend() {
   backend.on('error', (error) => {
     dialog.showErrorBox('Carroção Games', `Não foi possível iniciar o servidor local.\n${error.message}`);
     app.quit();
+  });
+}
+
+function hidScriptPath() {
+  return path.join(app.getAppPath(), 'hid', 'controle_hid.py');
+}
+
+function startHidController() {
+  const pythonRuntime = process.env.CARROCAO_HID_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  hidController = spawn(pythonRuntime, [hidScriptPath()], {
+    cwd: app.getAppPath(),
+    env: {
+      ...process.env,
+      CARROCAO_HID_API: `http://127.0.0.1:${PORT}/api/hid/config`,
+    },
+    stdio: 'inherit',
+  });
+
+  hidController.on('error', (error) => {
+    console.error(`[HID] Não foi possível iniciar o controlador (${pythonRuntime}):`, error.message);
+  });
+  hidController.on('exit', (code, signal) => {
+    if (code !== 0 && signal !== 'SIGTERM') {
+      console.error(`[HID] Controlador encerrado (código ${code}, sinal ${signal || 'nenhum'}).`);
+    }
   });
 }
 
@@ -73,6 +103,7 @@ app.whenReady().then(async () => {
   startBackend();
   try {
     await waitForServer();
+    startHidController();
     createWindow();
   } catch (error) {
     dialog.showErrorBox('Carroção Games', error.message);
@@ -81,4 +112,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => backend?.kill());
+app.on('before-quit', () => {
+  hidController?.kill();
+  backend?.kill();
+});

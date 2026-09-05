@@ -10,7 +10,7 @@
             'second-place': index === 1,
             'third-place': index === 2
           }"
-          :style="{ 'background-color': getTeamColorHex(item.name) }"
+          :style="{ 'background-color': getTeamColorHex(item.name), color: getTeamTextColor(item.name) }"
         >
           <span class="rank-position">{{ index + 1 }}º</span>
           <span v-if="index === 0" class="trophy-icon">🏆</span>
@@ -47,9 +47,11 @@
           default: return '#6c757d'; // Cor padrão para equipes não mapeadas
         }
       };
+      const getTeamTextColor = (teamName: string) => teamName === 'Amarelo' ? '#493b00' : '#ffffff';
   
       return {
         getTeamColorHex,
+        getTeamTextColor,
       };
     },
   });
@@ -57,15 +59,15 @@
   
   <style scoped>
   .scoreboard-blocks-container {
-    background-color: #ffffff;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-    margin-top: 25px;
+    background: transparent;
+    padding: clamp(1rem, 2.2vw, 2rem);
+    border-radius: 18px;
+    box-shadow: none;
+    margin-top: 1rem;
     width: 100%;
-    max-width: 900px; /* AUMENTADO PARA 900px */
+    max-width: 1120px;
     text-align: left;
-    border: 1px solid #e9ecef;
+    border: 0;
     box-sizing: border-box;
   }
   
@@ -79,15 +81,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 30px;
-    margin-bottom: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    padding: clamp(1.1rem, 2.2vw, 1.8rem) clamp(1.2rem, 3vw, 2.6rem);
+    margin-bottom: 1.25rem;
+    min-height: clamp(5rem, 10vh, 7rem);
+    border-radius: 16px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
     transition: all 0.3s ease;
     font-size: 1.3em;
     font-weight: 500;
     color: white;
-    border-left: 10px solid rgba(0, 0, 0, 0.2);
+    border-left: 12px solid rgba(0, 0, 0, 0.2);
   }
   
   .ranking-item:last-child {
@@ -100,17 +103,17 @@
   }
   
   .rank-position {
-    font-size: 1.8em;
+    font-size: clamp(1.4rem, 3vw, 2.2rem);
     font-weight: 900;
     margin-right: 20px;
-    min-width: 50px;
+    min-width: 3.5rem;
     text-align: center;
     color: rgba(255, 255, 255, 0.9);
   }
   
   .trophy-icon {
-    font-size: 2.5em;
-    margin-right: 15px;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    margin-right: 1rem;
     animation: bounce 0.8s infinite alternate;
     color: #ffd700;
     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
@@ -134,11 +137,11 @@
   }
   
   .team-points {
-    font-size: 2.2em;
+    font-size: clamp(2rem, 4.5vw, 3.6rem);
     font-weight: 900;
     color: white;
     margin-left: 25px;
-    min-width: 90px; /* Garante espaço para pontuações de 3 dígitos */
+    min-width: 7rem;
     text-align: right;
     white-space: nowrap; /* Impede quebra de linha */
   }

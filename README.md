@@ -89,7 +89,7 @@ Os jogos foram pensados para serem operados por teclado em um telão. Mantenha o
 
 ### BUG
 
-O BUG tem três fases: sorteio, palavra e tabuleiro. A ordem dos times nesse jogo é Vermelho, Azul, Verde e Amarelo.
+O BUG tem três fases: sorteio, palavra e tabuleiro. A ordem dos times nesse jogo é Azul, Vermelho, Verde e Amarelo.
 
 #### 1. Sorteio
 
@@ -107,12 +107,12 @@ Depois do sorteio:
 
 - Para `Ganhe 20` e `Perca 20`, use `Espaço` para aplicar o efeito e iniciar a próxima rodada, ou `P` para aplicar o efeito e abrir o placar.
 - Para `10 a 50`, use `1` a `5` para escolher respectivamente 10, 20, 30, 40 ou 50 pontos; confirme com `Espaço`.
-- Para `Tire uma` e `Tire duas`, use `1` Vermelho, `2` Azul, `3` Verde e `4` Amarelo para marcar os times e `Espaço` para confirmar.
+- Para `Tire uma` e `Tire duas`, use `1` Azul, `2` Vermelho, `3` Verde e `4` Amarelo para marcar os times e `Espaço` para confirmar.
 - `Fora` desabilita o time da vez na fase da palavra.
 
 #### 2. Palavra
 
-1. Escolha o time que vai responder: `1` Vermelho, `2` Azul, `3` Verde e `4` Amarelo.
+1. Escolha o time que vai responder: `1` Azul, `2` Vermelho, `3` Verde e `4` Amarelo.
 2. Use `O` para resposta correta ou `X` para resposta errada.
 3. Após um acerto, a palavra correta é mostrada; pressione `Espaço` para avançar ao tabuleiro.
 
@@ -131,6 +131,11 @@ O menu lateral possui as opções `Backup`, que baixa o banco SQLite atual, e
 substitui os dados atuais após confirmação e valida o arquivo antes da troca.
 
 ### Configuração da botoeira
+
+O menu `Atalhos` permite alterar as teclas das ações do sistema e dos jogos.
+Os valores iniciais são os atalhos tradicionais descritos neste documento e
+as alterações são salvas no SQLite. Atalhos são únicos dentro de cada contexto
+(por exemplo, uma tecla não pode ser repetida entre duas ações da mesma fase).
 
 O menu `Botoeira` permite cadastrar controles e mapear entradas SDL/Pygame para
 teclas do jogo. O controlador unificado está em `hid/controle_hid.py` e lê sua

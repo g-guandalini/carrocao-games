@@ -4,6 +4,7 @@ import SplashScreen from '../components/SplashScreen.vue';
 import ImagemOcultaView from '../views/ImagemOcultaView.vue';
 import ConexaoView from '../views/ConexaoView.vue';
 import BugView from '../views/BugView.vue';
+import ScoreboardView from '../views/ScoreboardView.vue';
 
 import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import CategoryManagement from '../views/admin/CategoryManagement.vue';
@@ -13,6 +14,7 @@ import BugWordsManagement from '../views/admin/BugWordsManagement.vue';
 import BugBoardsManagement from '../views/admin/BugBoardsManagement.vue';
 import ScoreManagement from '../views/admin/ScoreManagement.vue'; // Importar ScoreManagement
 import HidManagement from '../views/admin/HidManagement.vue';
+import ShortcutManagement from '../views/admin/ShortcutManagement.vue';
 
 
 const routes: Array<RouteRecordRaw> = [
@@ -35,6 +37,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/bug',
     name: 'BugGame',
     component: BugView,
+  },
+  {
+    path: '/placar',
+    name: 'Scoreboard',
+    component: ScoreboardView,
   },
   {
     path: '/admin',
@@ -98,6 +105,12 @@ const routes: Array<RouteRecordRaw> = [
         name: 'AdminHid',
         component: HidManagement,
         meta: { title: 'Configurar Botoeira' }
+      },
+      {
+        path: 'shortcuts',
+        name: 'AdminShortcuts',
+        component: ShortcutManagement,
+        meta: { title: 'Configurar Atalhos' }
       },
     ],
   },

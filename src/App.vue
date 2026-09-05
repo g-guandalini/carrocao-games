@@ -20,11 +20,12 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watchEffect } from 'vue';
+import { defineComponent, computed, watchEffect, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 
 import ToastNotification from './components/ToastNotification.vue';
 import AdminLayout from './layouts/AdminLayout.vue';
+import { loadShortcuts } from './store/shortcutStore';
 
 export default defineComponent({
   name: 'App',
@@ -34,6 +35,28 @@ export default defineComponent({
   },
   setup() {
     const route = useRoute();
+    loadShortcuts().catch(error => console.warn('[Atalhos] Não foi possível carregar configurações:', error));
+    let hidSequence = 0;
+    let hidTimer: ReturnType<typeof setInterval> | null = null;
+    const pollHidEvents = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/hid/events?after=${hidSequence}`);
+        if (!response.ok) return;
+        const events = await response.json() as { sequence: number; key: string }[];
+        for (const hidEvent of events) {
+          hidSequence = Math.max(hidSequence, hidEvent.sequence);
+          // Dispara no elemento focado para atender tanto listeners em
+          // `document`/`window` quanto as fases do BUG que usam @keydown no
+          // próprio container focado.
+          const eventTarget = document.activeElement || document.body;
+          eventTarget.dispatchEvent(new KeyboardEvent('keydown', { key: hidEvent.key, bubbles: true }));
+        }
+      } catch {
+        // O backend pode estar reiniciando; a próxima consulta tenta novamente.
+      }
+    };
+    onMounted(() => { hidTimer = setInterval(pollHidEvents, 50); });
+    onUnmounted(() => { if (hidTimer) clearInterval(hidTimer); });
 
     // **Para depuração:** Observe o objeto route para ver o que ele contém
     watchEffect(() => {

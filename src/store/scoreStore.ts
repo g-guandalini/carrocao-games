@@ -107,5 +107,15 @@ export async function resetScores() {
   }
 }
 
+/** Restaura todas as equipes para a pontuação padrão de 100. */
+export async function resetScoresTo100() {
+  const response = await fetch(`${API_BASE_URL}/api/scores/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error(`Erro HTTP ao resetar pontuações: ${response.status}`);
+  await fetchScores();
+}
+
 // Chamada inicial para carregar as pontuações quando a store é criada
 fetchScores();

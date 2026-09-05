@@ -35,6 +35,7 @@
 <script lang="ts">
 import { defineComponent, PropType, computed, onMounted, onUnmounted, nextTick, ref, watch } from 'vue';
 import { TeamColor } from '../types';
+import { matchesShortcut } from '../store/shortcutStore';
 import AnswerFeedback from './AnswerFeedback.vue';
 
 export default defineComponent({
@@ -65,10 +66,10 @@ export default defineComponent({
     const showCorrectWord = ref(false); // Controla a exibição da palavra correta
     const waitingForSpace = ref(false); // Controla se está aguardando a tecla Espaço
 
-    // CORREÇÃO AQUI: Mapeamento correto das teclas para os times
+    // Mantém o mesmo mapeamento de equipes usado pelos demais jogos.
     const teamKeyMap: { [key: string]: TeamColor } = {
-      '1': TeamColor.RED,    // Tecla 1 para Vermelho
-      '2': TeamColor.BLUE,   // Tecla 2 para Azul
+      '1': TeamColor.BLUE,   // Tecla 1 para Azul
+      '2': TeamColor.RED,    // Tecla 2 para Vermelho
       '3': TeamColor.GREEN,  // Tecla 3 para Verde
       '4': TeamColor.YELLOW, // Tecla 4 para Amarelo
     };
@@ -134,7 +135,7 @@ export default defineComponent({
         }
       });
 
-      if (waitingForSpace.value && event.code === 'Space') {
+      if (waitingForSpace.value && matchesShortcut(event, 'general_space', 'Space')) {
         event.preventDefault();
         waitingForSpace.value = false;
         showCorrectWord.value = false;
@@ -147,7 +148,10 @@ export default defineComponent({
         return;
       }
 
-      const team = teamKeyMap[event.key];
+      const team = Object.entries(teamKeyMap).find(([key]) => {
+        const code = key === '1' ? 'team_blue' : key === '2' ? 'team_red' : key === '3' ? 'team_green' : 'team_yellow';
+        return matchesShortcut(event, code, key);
+      })?.[1];
       if (team) {
         event.preventDefault();
         selectGuessingTeam(team);

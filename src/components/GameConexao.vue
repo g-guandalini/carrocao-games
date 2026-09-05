@@ -56,6 +56,7 @@
 <script lang="ts">
 import { defineComponent, PropType, computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Conexao, GameStatus, TeamColor } from '../types';
+import { matchesShortcut } from '../store/shortcutStore';
 import AnswerFeedback from './AnswerFeedback.vue';
 import FireworksCanvas from './FireworksCanvas.vue';
 
@@ -181,11 +182,11 @@ export default defineComponent({
     const handleKeyPress = (event: KeyboardEvent) => {
       // MODIFICAÇÃO AQUI: Lógica para 'Espaço' e 'P' quando o jogo está 'finished'
       if (props.gameStatus === 'finished' && showGameFinishedOverlay.value) {
-        if (event.code === 'Space') { // Iniciar nova rodada
+        if (matchesShortcut(event, 'general_space', 'Space')) { // Iniciar nova rodada
           event.preventDefault();
           emit('start-new-round'); // Emite o novo evento para iniciar uma rodada
           return;
-        } else if (event.key === 'p' || event.key === 'P') { // Ir para o placar
+        } else if (matchesShortcut(event, 'general_scoreboard', 'P')) { // Ir para o placar
           event.preventDefault();
           viewConexaoScoreboard(); // Chama a função existente para ir ao placar
           return;
@@ -195,20 +196,10 @@ export default defineComponent({
       if (!isColorSelectionLocked.value && props.gameStatus !== 'finished' && props.gameStatus === 'guessing') {
         let teamNameKey: string | null = null;
 
-        switch (event.key) {
-          case '1':
-            teamNameKey = 'Azul';
-            break;
-          case '2':
-            teamNameKey = 'Vermelho';
-            break;
-          case '3':
-            teamNameKey = 'Verde';
-            break;
-          case '4':
-            teamNameKey = 'Amarelo';
-            break;
-        }
+        if (matchesShortcut(event, 'team_blue', '1')) teamNameKey = 'Azul';
+        else if (matchesShortcut(event, 'team_red', '2')) teamNameKey = 'Vermelho';
+        else if (matchesShortcut(event, 'team_green', '3')) teamNameKey = 'Verde';
+        else if (matchesShortcut(event, 'team_yellow', '4')) teamNameKey = 'Amarelo';
 
         if (teamNameKey) {
           const colorToApply = teamNameToHex[teamNameKey];

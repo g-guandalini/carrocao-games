@@ -23,7 +23,10 @@
             class="score-input"
           />
         </div>
-        <button type="submit" class="btn-save-scores">Salvar Pontuações</button>
+        <div class="score-actions">
+          <button type="submit" class="btn-save-scores">Salvar Pontuações</button>
+          <button type="button" class="btn-reset-scores" :disabled="loading" @click="resetScores">Resetar</button>
+        </div>
       </form>
     </div>
   </div>
@@ -31,7 +34,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue';
-import { scoreStore, fetchScores, setScore } from '../../store/scoreStore'; // Ajuste o caminho conforme necessário
+import { scoreStore, fetchScores, setScore, resetScoresTo100 } from '../../store/scoreStore'; // Ajuste o caminho conforme necessário
 import { TeamColor } from '../../types'; // Ajuste o caminho e certifique-se que TeamColor está definido
 
 export default defineComponent({
@@ -118,6 +121,23 @@ export default defineComponent({
       }
     };
 
+    const resetScores = async () => {
+      if (!window.confirm('Deseja resetar todas as equipes para 100 pontos?')) return;
+      loading.value = true;
+      error.value = null;
+      try {
+        await resetScoresTo100();
+        await loadScores();
+        alert('Todas as equipes foram resetadas para 100 pontos.');
+      } catch (err) {
+        console.error('Erro ao resetar pontuações:', err);
+        error.value = 'Não foi possível resetar as pontuações.';
+        alert('Erro ao resetar pontuações.');
+      } finally {
+        loading.value = false;
+      }
+    };
+
     onMounted(loadScores);
 
     return {
@@ -125,6 +145,7 @@ export default defineComponent({
       error,
       editableScores,
       saveScores,
+      resetScores,
       getTeamCssClass,
       displayTeamName, // Expor a função para uso no template
     };
@@ -222,6 +243,36 @@ h3 {
   align-self: center; /* Centraliza o botão */
   width: fit-content;
   transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out; /* Transições suaves */
+}
+
+.score-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.score-actions .btn-save-scores {
+  margin-top: 0;
+}
+
+.btn-reset-scores {
+  padding: 12px 25px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1.1em;
+}
+
+.btn-reset-scores:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.btn-reset-scores:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .btn-save-scores:hover {

@@ -195,12 +195,19 @@ html, body {
 .backup-link {
   width: 100%;
   box-sizing: border-box;
+  background-color: transparent;
   border-top: 0;
   border-right: 0;
   border-bottom: 0;
   border-left: 5px solid transparent;
   font-family: inherit;
+  text-align: left;
   cursor: pointer;
+  appearance: none;
+}
+
+.backup-link:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .nav-link i {

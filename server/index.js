@@ -3,7 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { initializeDatabase, getDb, getDbPath, runAsync, allAsync, getAsync } = require('./database');
+const multer = require('multer');
+const { initializeDatabase, getDb, getDbPath, restoreDatabase, runAsync, allAsync, getAsync } = require('./database');
 
 const categoryRoutes = require('./routes/categoryRoutes');
 const imagemOcultaRoutes = require('./routes/imagemOcultaRoutes');
@@ -11,7 +12,11 @@ const conexaoRoutes = require('./routes/conexaoRoutes');
 const bugRoutes = require('./routes/bugRoutes'); // Importar as novas rotas do BUG
 
 const app = express();
-const PORT = process.env.PORT || 3001; 
+const PORT = process.env.PORT || 3001;
+const restoreUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 200 * 1024 * 1024 },
+});
 
 app.use(cors());
 app.use(express.json());
@@ -82,6 +87,23 @@ app.get('/api/admin/backup', (req, res) => {
         }
     });
     stream.pipe(res);
+});
+
+app.post('/api/admin/restore', restoreUpload.single('database'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'Selecione um arquivo SQLite para restaurar.' });
+    }
+    if (req.file.buffer.subarray(0, 16).toString() !== 'SQLite format 3\0') {
+        return res.status(400).json({ error: 'O arquivo selecionado não é um banco SQLite válido.' });
+    }
+
+    try {
+        await restoreDatabase(req.file.buffer);
+        res.json({ message: 'Banco de dados restaurado com sucesso.' });
+    } catch (error) {
+        console.error('[Backup] Erro ao restaurar banco de dados:', error);
+        res.status(400).json({ error: 'Não foi possível restaurar o banco de dados.' });
+    }
 });
 
 // Suas rotas existentes da API

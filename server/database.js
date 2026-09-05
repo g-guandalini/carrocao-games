@@ -59,6 +59,65 @@ function allAsync(sql, params = []) {
     });
 }
 
+function closeDb() {
+    return new Promise((resolve, reject) => {
+        if (!db) return resolve();
+        db.close((err) => {
+            if (err) return reject(err);
+            db = null;
+            resolve();
+        });
+    });
+}
+
+function validateDatabaseFile(filePath) {
+    return new Promise((resolve, reject) => {
+        const candidate = new sqlite3.Database(filePath, sqlite3.OPEN_READONLY, (openError) => {
+            if (openError) return reject(openError);
+            candidate.get('PRAGMA integrity_check', (checkError, row) => {
+                candidate.close(() => {
+                    if (checkError) return reject(checkError);
+                    if (!row || row.integrity_check !== 'ok') {
+                        return reject(new Error('O arquivo SQLite não passou na verificação de integridade.'));
+                    }
+                    resolve();
+                });
+            });
+        });
+    });
+}
+
+async function restoreDatabase(buffer) {
+    const tempPath = `${DB_PATH}.restore-${Date.now()}`;
+    const previousPath = `${DB_PATH}.before-restore`;
+    fs.writeFileSync(tempPath, buffer);
+
+    try {
+        await validateDatabaseFile(tempPath);
+        await closeDb();
+        fs.copyFileSync(DB_PATH, previousPath);
+        fs.copyFileSync(tempPath, DB_PATH);
+        await connectDb();
+        await createTables();
+        await seedInitialData();
+        fs.rmSync(previousPath, { force: true });
+    } catch (error) {
+        try {
+            await closeDb();
+            if (fs.existsSync(previousPath)) {
+                fs.copyFileSync(previousPath, DB_PATH);
+                fs.rmSync(previousPath, { force: true });
+                await connectDb();
+            }
+        } catch (rollbackError) {
+            console.error('[DB] Falha ao reverter restauração:', rollbackError);
+        }
+        throw error;
+    } finally {
+        fs.rmSync(tempPath, { force: true });
+    }
+}
+
 /**
  * Conecta ao banco de dados SQLite. Se o arquivo não existir, ele será criado.
  */
@@ -492,6 +551,7 @@ async function initializeDatabase() {
 module.exports = {
     initializeDatabase,
     getDbPath: () => DB_PATH,
+    restoreDatabase,
     getDb: () => db,
     runAsync,
     getAsync,

@@ -42,6 +42,12 @@
               <i class="fas fa-download"></i> Backup
             </a>
           </li>
+          <li>
+            <button type="button" class="nav-link backup-link" :disabled="isRestoring" @click="openRestorePicker">
+              <i class="fas fa-upload"></i> {{ isRestoring ? 'Restaurando...' : 'Restaurar' }}
+            </button>
+            <input ref="restoreInput" type="file" accept=".sqlite,.db" hidden @change="restoreDatabase" />
+          </li>
         </ul>
       </nav>
 
@@ -70,13 +76,48 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, ref } from 'vue';
 
 export default defineComponent({
   name: 'AdminLayout',
   setup() {
-    const backupUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/admin/backup`;
-    return { backupUrl };
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const backupUrl = `${apiBaseUrl}/api/admin/backup`;
+    const restoreUrl = `${apiBaseUrl}/api/admin/restore`;
+    const restoreInput = ref<HTMLInputElement | null>(null);
+    const isRestoring = ref(false);
+
+    const openRestorePicker = () => restoreInput.value?.click();
+    const restoreDatabase = async (event: Event) => {
+      const input = event.target as HTMLInputElement;
+      const file = input.files?.[0];
+      if (!file) return;
+      if (!window.confirm('Restaurar este banco substituirá os dados atuais. Deseja continuar?')) {
+        input.value = '';
+        return;
+      }
+
+      isRestoring.value = true;
+      try {
+        const formData = new FormData();
+        formData.append('database', file);
+        const response = await fetch(restoreUrl, {
+          method: 'POST',
+          body: formData,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Falha ao restaurar o banco.');
+        window.alert(result.message);
+        window.location.reload();
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'Não foi possível restaurar o banco de dados.');
+      } finally {
+        isRestoring.value = false;
+        input.value = '';
+      }
+    };
+
+    return { backupUrl, restoreInput, isRestoring, openRestorePicker, restoreDatabase };
   },
 });
 </script>

@@ -1,7 +1,7 @@
 {
   "name": "carrocao-games",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Jogos do Sítio do Carroção para telão",
   "author": "Guandalini",
   "desktopName": "carrocao-games",
@@ -61,6 +61,9 @@
     "linux": {
       "target": "AppImage",
       "category": "Game"
+    },
+    "win": {
+      "target": "nsis"
     }
   }
 }

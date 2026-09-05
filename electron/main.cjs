@@ -58,7 +58,7 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 600,
-    icon: path.join(app.getAppPath(), 'public', 'logo_sitio.ico'),
+    icon: path.join(app.getAppPath(), 'public', 'logo_sitio_electron.png'),
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
 

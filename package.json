@@ -1,7 +1,10 @@
 {
   "name": "carrocao-games",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Jogos do Sítio do Carroção para telão",
+  "author": "Guandalini",
+  "desktopName": "carrocao-games",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -39,7 +42,7 @@
   "build": {
     "appId": "com.carrocao.games",
     "productName": "Carroção Games",
-    "icon": "public/logo_sitio.ico",
+    "icon": "public/logo_sitio_electron.png",
     "directories": {
       "output": "release"
     },
@@ -47,6 +50,7 @@
       "dist/**/*",
       "electron/**/*",
       "public/logo_sitio.ico",
+      "public/logo_sitio_electron.png",
       "server/**/*",
       "!server/node_modules/**/*",
       "package.json"

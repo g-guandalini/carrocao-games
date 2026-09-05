@@ -220,6 +220,30 @@ async function createTables() {
         `);
         console.log('Tabela "scores" criada ou já existe.');
 
+        // Dispositivos e mapeamentos da botoeira (SDL/Pygame)
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS hid_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                identifier TEXT UNIQUE,
+                driver_type TEXT NOT NULL DEFAULT 'sdl',
+                enabled INTEGER NOT NULL DEFAULT 1
+            );
+        `);
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS hid_mappings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER,
+                name TEXT NOT NULL,
+                input_code TEXT NOT NULL,
+                output_key TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (device_id) REFERENCES hid_devices(id) ON DELETE CASCADE,
+                UNIQUE (device_id, input_code)
+            );
+        `);
+        console.log('Tabelas "hid_devices" e "hid_mappings" criadas ou já existem.');
+
         // =========================================================
         //                 NOVAS TABELAS PARA CONEXÃO (COM order_idx)
         // =========================================================

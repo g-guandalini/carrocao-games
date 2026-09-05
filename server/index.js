@@ -10,6 +10,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const imagemOcultaRoutes = require('./routes/imagemOcultaRoutes');
 const conexaoRoutes = require('./routes/conexaoRoutes');
 const bugRoutes = require('./routes/bugRoutes'); // Importar as novas rotas do BUG
+const hidRoutes = require('./routes/hidRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -170,6 +171,7 @@ app.use('/api/admin/categories', categoryRoutes);
 app.use('/api', imagemOcultaRoutes);
 app.use('/api', conexaoRoutes);
 app.use('/api', bugRoutes); // Usar as novas rotas do BUG
+app.use('/api', hidRoutes);
 
 
 // --- Servir arquivos estáticos do frontend (JS, CSS, imagens de assets) ---

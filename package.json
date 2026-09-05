@@ -49,6 +49,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "hid/**/*",
       "public/logo_sitio.ico",
       "public/logo_sitio_electron.png",
       "server/**/*",

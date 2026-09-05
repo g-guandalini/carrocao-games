@@ -38,6 +38,11 @@
             </router-link>
           </li>
           <li>
+            <router-link :to="{ name: 'AdminHid' }" class="nav-link">
+              <i class="fas fa-gamepad"></i> Botoeira
+            </router-link>
+          </li>
+          <li>
             <a :href="backupUrl" class="nav-link backup-link" download>
               <i class="fas fa-download"></i> Backup
             </a>

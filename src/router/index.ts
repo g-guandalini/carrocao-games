@@ -12,6 +12,7 @@ import ConexaoManagement from '../views/admin/ConexaoManagement.vue';
 import BugWordsManagement from '../views/admin/BugWordsManagement.vue';
 import BugBoardsManagement from '../views/admin/BugBoardsManagement.vue';
 import ScoreManagement from '../views/admin/ScoreManagement.vue'; // Importar ScoreManagement
+import HidManagement from '../views/admin/HidManagement.vue';
 
 
 const routes: Array<RouteRecordRaw> = [
@@ -91,6 +92,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
             title: 'Gerenciar Pontuações'
         }
+      },
+      {
+        path: 'hid',
+        name: 'AdminHid',
+        component: HidManagement,
+        meta: { title: 'Configurar Botoeira' }
       },
     ],
   },

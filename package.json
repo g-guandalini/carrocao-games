@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
+    "electron": "npm run build && electron . --no-sandbox --production",
+    "electron:dev": "concurrently -k \"vite --strictPort\" \"wait-on http://127.0.0.1:5173 && electron . --no-sandbox\"",
+    "electron:package": "npm run build && electron-builder",
     "install-backend": "npm install --prefix ./server",
     "start-backend": "node server/index.js",
     "render-build": "npm install && npm run install-backend && npm run build",
@@ -14,14 +17,46 @@
   },
   "dependencies": {
     "axios": "^1.13.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "sqlite3": "^5.1.7",
     "vue": "^3.4.21",
     "vue-router": "^4.6.3"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
     "@vitejs/plugin-vue": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
+    "wait-on": "^8.0.3",
     "vue-tsc": "^2.0.6"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.carrocao.games",
+    "productName": "Carroção Games",
+    "icon": "public/logo_sitio.ico",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/logo_sitio.ico",
+      "server/**/*",
+      "!server/node_modules/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Game"
+    }
   }
 }

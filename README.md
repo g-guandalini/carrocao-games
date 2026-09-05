@@ -146,6 +146,46 @@ npm run start-backend
 
 O backend serve os arquivos gerados em `dist` junto com a API na porta `3001`.
 
+## Aplicativo desktop (Electron)
+
+O Electron inicia automaticamente o backend Express e a interface Vue. Não é
+necessário abrir terminais separados para o Vite e para o backend.
+
+Instale as dependências da raiz e do backend uma vez:
+
+```bash
+npm install
+npm run install-backend
+```
+
+Durante o desenvolvimento, com recarregamento automático do frontend:
+
+```bash
+npm run electron:dev
+```
+
+Esse comando usa as portas `5173` (Vite) e `3001` (API). Se elas estiverem
+ocupadas por uma execução anterior ou por containers Docker, encerre esses
+processos antes de iniciar o Electron.
+
+Para compilar e abrir a versão de produção local:
+
+```bash
+npm run electron
+```
+
+Para gerar o pacote Linux AppImage em `release/`:
+
+```bash
+npm run electron:package
+```
+
+O pacote gerado fica em `release/` (Linux AppImage). No Linux, os scripts já
+usam `--no-sandbox` para funcionar também quando o helper SUID do Electron não
+está configurado.
+
+No aplicativo empacotado, o banco e as imagens cadastradas ficam em `game-data` no diretório de dados da aplicação, preservando-os entre atualizações.
+
 ## Sem Node instalado: usar Docker
 
 Instale as dependências uma vez:

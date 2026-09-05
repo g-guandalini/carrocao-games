@@ -37,6 +37,11 @@
               <i class="fas fa-trophy"></i> Pontuações
             </router-link>
           </li>
+          <li>
+            <a :href="backupUrl" class="nav-link backup-link" download>
+              <i class="fas fa-download"></i> Backup
+            </a>
+          </li>
         </ul>
       </nav>
 
@@ -69,6 +74,10 @@ import { defineComponent } from 'vue';
 
 export default defineComponent({
   name: 'AdminLayout',
+  setup() {
+    const backupUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/admin/backup`;
+    return { backupUrl };
+  },
 });
 </script>
 
@@ -140,6 +149,17 @@ html, body {
   font-size: 1.1em;
   transition: background-color 0.2s ease, color 0.2s ease;
   border-left: 5px solid transparent;
+}
+
+.backup-link {
+  width: 100%;
+  box-sizing: border-box;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 5px solid transparent;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .nav-link i {

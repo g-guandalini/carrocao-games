@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { initializeDatabase, getDb, runAsync, allAsync, getAsync } = require('./database'); 
+const { initializeDatabase, getDb, getDbPath, runAsync, allAsync, getAsync } = require('./database');
 
 const categoryRoutes = require('./routes/categoryRoutes');
 const imagemOcultaRoutes = require('./routes/imagemOcultaRoutes');
@@ -18,8 +18,9 @@ app.use(express.json());
 
 // --- Configuração de Caminhos ---
 const projectRoot = path.join(__dirname, '..'); // Caminho para a raiz do projeto (carrocao-games)
-const publicPath = path.join(projectRoot, 'public'); // Onde ficam as imagens de upload (originalmente)
-const frontendBuildPath = path.join(projectRoot, 'dist'); // Onde o Vite gera o frontend de produção
+const dataPath = process.env.GAME_DATA_PATH || projectRoot;
+const publicPath = path.join(dataPath, 'public'); // Uploads: graváveis também no Electron empacotado
+const frontendBuildPath = process.env.FRONTEND_BUILD_PATH || path.join(projectRoot, 'dist');
 
 
 // Garante que as pastas de upload existam
@@ -57,6 +58,21 @@ console.log(`[Backend] Servindo imagens de conexão de: ${conexaoImagesUploadPat
 app.get('/api/status', (req, res) => {
     // console.log('[Backend] Recebida requisição GET /api/status'); // Debugging
     res.send('Servidor Imagem Oculta API está online!');
+});
+
+// Download do banco para backup pelo painel administrativo.
+app.get('/api/admin/backup', (req, res) => {
+    const databasePath = getDbPath();
+    if (!fs.existsSync(databasePath)) {
+        return res.status(404).json({ error: 'Banco de dados ainda não disponível.' });
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+    res.download(databasePath, `carrocao-games-backup-${date}.sqlite`, (error) => {
+        if (error && !res.headersSent) {
+            res.status(500).json({ error: 'Não foi possível gerar o backup.' });
+        }
+    });
 });
 
 // Suas rotas existentes da API

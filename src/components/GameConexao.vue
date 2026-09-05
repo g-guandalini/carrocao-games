@@ -25,7 +25,7 @@
       </div>
 
       <!-- Palavra sendo revelada -->
-      <div class="word-display">
+      <div class="word-display" :class="{ 'finished-word': gameStatus === 'finished' }">
         <span v-for="(char, index) in formattedPalavra" :key="index" class="letter"
               :class="{ 'revealed': char !== '_' && char !== ' ' }"
               :style="gameStatus === 'finished' && winningTeamColorHex ? { color: winningTeamColorHex } : {}">
@@ -315,7 +315,7 @@ export default defineComponent({
 }
 
 .round-score-display {
-  margin-bottom: 1.5vh;
+  margin-bottom: 2.5vh;
   font-size: clamp(0.9em, 2vw, 1.5em);
   font-weight: bold;
   color: #34495e;
@@ -324,6 +324,7 @@ export default defineComponent({
   box-sizing: border-box;
   padding: 0 1vw;
   white-space: nowrap;
+  transform: translateY(-1vh);
 }
 
 .round-score-display .score-value {
@@ -349,6 +350,12 @@ export default defineComponent({
   overflow-wrap: break-word;
   height: auto;
   text-align: center;
+  /* Mantém os glifos inteiros dentro da área inferior do jogo. */
+  transform: translateY(-5vh);
+}
+
+.word-display.finished-word {
+  transform: none;
 }
 .letter {
   display: inline-block;

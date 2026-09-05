@@ -1,9 +1,22 @@
 // server/database.js
-const sqlite3 = require('sqlite3').verbose();
+// O Electron usa as dependências instaladas na raiz. Se existir uma instalação
+// legada em server/node_modules (por exemplo, compilada para Alpine/musl),
+// tente a cópia compatível da raiz antes de falhar ao carregar o binding nativo.
+let sqlite3;
+try {
+    sqlite3 = require('sqlite3').verbose();
+} catch (error) {
+    if (error.code !== 'ERR_DLOPEN_FAILED') throw error;
+    sqlite3 = require('../node_modules/sqlite3').verbose();
+}
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'db', 'game.db');
+// No Electron, os dados ficam fora do pacote da aplicação para continuarem
+// graváveis e sobreviverem a atualizações. Fora dele, mantém o local legado.
+const DB_PATH = process.env.GAME_DB_PATH || path.join(__dirname, 'db', 'game.db');
+
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 let db;
 
@@ -478,6 +491,7 @@ async function initializeDatabase() {
 // Exporta as funções e as auxiliares
 module.exports = {
     initializeDatabase,
+    getDbPath: () => DB_PATH,
     getDb: () => db,
     runAsync,
     getAsync,

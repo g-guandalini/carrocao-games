@@ -233,8 +233,10 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   background-color: #f0f2f5;
   color: #333;
   box-sizing: border-box;
@@ -242,7 +244,8 @@ html, body {
 }
 
 .game-content-wrapper {
-  flex-grow: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -261,7 +264,7 @@ html, body {
   font-size: 1.5em;
   color: #555;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -297,6 +300,8 @@ html, body {
 .game-active-area {
     width: 100%;
     height: 100%;
+    min-height: 0;
+    min-width: 0;
     display: flex;
     justify-content: center;
     align-items: center;

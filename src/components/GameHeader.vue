@@ -18,13 +18,14 @@ export default defineComponent({
 <style scoped>
 .game-active-header {
   width: 100%;
+  height: 60px;
+  flex: 0 0 60px;
   background-color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  position: sticky;
-  top: 0;
+  overflow: hidden;
   z-index: 1000;
   justify-content:center
 }
@@ -37,7 +38,7 @@ export default defineComponent({
 
 /* NOVO ESTILO PARA O LOGO MINI */
 .game-header-logo-mini-img {
-  height: 60px; /* Ajuste este valor conforme desejar */
+  height: 60px;
   width: auto; /* Mantém a proporção */
   display: block;
 }

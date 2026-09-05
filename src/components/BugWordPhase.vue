@@ -79,16 +79,16 @@ export default defineComponent({
       if (wordLength < 10) {
         // Palavras curtas: um pouco maiores
         return {
-          'min-width': '10vh',
-          'min-height': '12vh',
-          'font-size': '12vh',
+          'min-width': 'clamp(3rem, min(10vh, 8vw), 7rem)',
+          'min-height': 'clamp(3rem, min(10vh, 8vw), 7rem)',
+          'font-size': 'clamp(2.5rem, min(9vh, 7vw), 6rem)',
         };
       } else {
         // Palavras longas: tamanho atual
         return {
-          'min-width': '8vh',
-          'min-height': '10vh',
-          'font-size': '9vh',
+          'min-width': 'clamp(2.3rem, min(8vh, 6vw), 5.5rem)',
+          'min-height': 'clamp(2.3rem, min(8vh, 6vw), 5.5rem)',
+          'font-size': 'clamp(2rem, min(7vh, 5vw), 4.5rem)',
         };
       }
     });
@@ -195,19 +195,20 @@ export default defineComponent({
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 90vw;
+  width: 100%;
   max-width: none;
-  height: 100vh;
-  margin: auto;
-  padding: 5vh 3vw;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(1rem, 3vh, 3rem) clamp(1rem, 3vw, 4rem);
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   text-align: center;
   position: relative;
   box-sizing: border-box;
-  max-height: 100vh;
-  overflow-y: auto;
+  max-height: none;
+  overflow: hidden;
   font-size: 16px; /* Base font-size */
 }
 
@@ -219,6 +220,8 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  max-width: 100%;
   gap: 2.5vh;
   justify-content: center;
 }

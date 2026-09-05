@@ -143,8 +143,20 @@ export const currentRoundPotentialScore = computed(() => {
 let revealImageTimer: number | null = null;
 let revealLetterInterval: number | null = null;
 
-const REVEAL_IMAGE_DURATION_MS = import.meta.env.VITE_TEMPO_RODADA_CONEXAO;
-const REVEAL_LETTER_STEP_MS = import.meta.env.VITE_TEMPO_LETRA_CONEXAO;
+function readDurationFromEnvironment(value: string | undefined, fallback: number): number {
+  const duration = Number(value);
+  return Number.isFinite(duration) && duration > 0 ? duration : fallback;
+}
+
+// Mantém a rodada legível mesmo quando as variáveis de ambiente não foram configuradas.
+const REVEAL_IMAGE_DURATION_MS = readDurationFromEnvironment(
+  import.meta.env.VITE_TEMPO_RODADA_CONEXAO,
+  30_000,
+);
+const REVEAL_LETTER_STEP_MS = readDurationFromEnvironment(
+  import.meta.env.VITE_TEMPO_LETRA_CONEXAO,
+  3_000,
+);
 
 interface ApiConexaoResponse {
   id: number;

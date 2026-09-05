@@ -467,10 +467,11 @@ export default defineComponent({
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 90vw;
-  height: 100vh;
-  margin: 0 auto;
-  padding: 5vh 3vw;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(1rem, 3vh, 3rem) clamp(1rem, 3vw, 4rem);
   background: #ffffff;
   border-radius: 0;
   box-shadow: none;
@@ -489,8 +490,11 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  width: min(100%, 1400px);
   gap: 2.5vh;
   justify-content: center;
+  align-items: center;
 }
 
 .main-content > * {
@@ -524,27 +528,30 @@ export default defineComponent({
 
 .options-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-columns: repeat(3, min(18vw, 25vh));
+  grid-template-rows: repeat(2, min(18vw, 25vh));
   gap: 1.5vw 1.5vh;
-  width: 100%;
+  width: auto;
+  justify-content: center;
   position: relative;
 }
 
 .team-selection-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-columns: repeat(2, min(28vw, 25vh));
+  grid-template-rows: repeat(2, min(28vw, 25vh));
   gap: 1.5vw 1.5vh;
-  width: 100%;
+  width: auto;
+  justify-content: center;
   position: relative;
 }
 
 .points-selection-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, min(15vw, 20vh));
   gap: 1.5vw 1.5vh;
-  width: 100%;
+  width: auto;
+  justify-content: center;
 }
 
 .option-button, .btn-confirm-points, .btn-confirm-removal, .point-button {
@@ -560,7 +567,7 @@ export default defineComponent({
   box-shadow: 0 0.5vh 1.5vh rgba(0, 0, 0, 0.1);
   opacity: 0.7;
   pointer-events: none;
-  height: 100%;
+  min-height: 0;
   display: flex;
   justify-content: center;
   align-items: center;

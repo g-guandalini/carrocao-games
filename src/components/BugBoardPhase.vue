@@ -211,18 +211,19 @@ export default defineComponent({
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 90vw;
+  width: 100%;
   max-width: none;
-  height: 100vh;
-  margin: auto;
-  padding: 5vh 1vw;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(0.75rem, 2vh, 2rem) clamp(0.75rem, 2vw, 2rem);
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   text-align: center;
   position: relative;
   box-sizing: border-box;
-  max-height: 100vh;
+  max-height: none;
   overflow-y: hidden;
   font-size: 16px;
 }
@@ -235,6 +236,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   gap: 1.5vh;
   justify-content: center;
   align-items: center;
@@ -261,9 +263,9 @@ export default defineComponent({
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(5, 19.5vh); /* MODIFICADO: Reduzido de 20vh para 19.5vh */
-  grid-template-rows: repeat(4, 19.5vh);    /* MODIFICADO: Reduzido de 20vh para 19.5vh */
-  gap: 1.5vh;
+  grid-template-columns: repeat(5, clamp(4rem, min(16vh, 16vw), 16rem));
+  grid-template-rows: repeat(4, clamp(4rem, min(16vh, 16vw), 16rem));
+  gap: clamp(0.4rem, 1.2vh, 1rem);
   width: auto;
   margin: 0 auto;
   margin-top: 0;

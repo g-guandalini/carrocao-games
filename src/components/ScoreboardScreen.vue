@@ -97,11 +97,13 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px;
+  padding: clamp(1rem, 3vh, 2.5rem);
   background-color: #f8f9fa;
   border-radius: 15px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  margin-top: 50px;
+  margin: 0;
+  width: min(94vw, 1000px);
+  max-height: 100%;
   max-width: 1000px; /* AUMENTADO PARA 1000px */
   text-align: center;
   position: relative;

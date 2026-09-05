@@ -133,7 +133,9 @@ export default defineComponent({
   padding: 0;
   font-family: 'Poppins', sans-serif;
   background-color: #f0f2f5;
-  height: 100%; /* Important: Refers to parent's height (which is 100vh from global CSS) */
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden; /* Hide any overflow within this wrapper */
   color: #333;
   width: 100%;
@@ -146,7 +148,9 @@ export default defineComponent({
 }
 
 .main-content-area {
-  flex-grow: 1; /* Occupy all remaining vertical space */
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden; /* Hide any overflow within this content area */
   width: 100%; /* Ensure it takes full width */
   display: flex; /* Maintain flex structure */

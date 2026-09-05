@@ -33,24 +33,25 @@
       </div>
     </div>
 
-    <!-- Texto de informação do jogo, agora usando v-if para remover do DOM quando não relevante -->
-    <p v-if="gameStatus === 'guessing' || gameStatus === 'revealing' || gameStatus === 'finished'"
-       class="game-info-text">
-      <template v-if="gameStatus === 'guessing' || gameStatus === 'revealing'">
-        Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
-      </template>
-      <template v-else-if="gameStatus === 'finished' && currentRoundCharacter">
-        Resposta: <strong>{{ currentRoundCharacter?.name }}</strong>
-      </template>
-    </p>
+    <!-- Faixa inferior: mesma posição reservada para textos e controles do jogo Conexão. -->
+    <div class="bottom-content-area">
+      <p v-if="gameStatus === 'guessing' || gameStatus === 'revealing' || gameStatus === 'finished'"
+         class="game-info-text">
+        <template v-if="gameStatus === 'guessing' || gameStatus === 'revealing'">
+          Pontos em jogo: <strong>{{ currentPotentialRoundScore }}</strong>
+        </template>
+        <template v-else-if="gameStatus === 'finished' && currentRoundCharacter">
+          Resposta: <strong>{{ currentRoundCharacter?.name }}</strong>
+        </template>
+      </p>
 
-    <!-- Wrapper para o Componente de Feedback do Operador - Sempre presente para manter o layout -->
-    <div class="answer-feedback-wrapper">
-      <AnswerFeedback
-        v-show="gameStatus === 'guessing'"
-        @correct-answer="handleCorrectAnswer"
-        @wrong-answer="handleWrongAnswer"
-      />
+      <div class="answer-feedback-wrapper">
+        <AnswerFeedback
+          v-show="gameStatus === 'guessing'"
+          @correct-answer="handleCorrectAnswer"
+          @wrong-answer="handleWrongAnswer"
+        />
+      </div>
     </div>
 
     <!-- Componente para exibir os toasts -->
@@ -104,6 +105,7 @@ export default defineComponent({
   emits: ['evaluate-guess', 'view-scoreboard', 'start-new-round-imagem-oculta'],
   setup(_props, { emit }) {
     const imageDisplayRef = ref<HTMLElement | null>(null);
+    let imageDisplayResizeObserver: ResizeObserver | null = null;
     const typingAudio = ref<HTMLAudioElement | null>(null);
     const correctAnswerAudio = ref<HTMLAudioElement | null>(null); // NOVO: Ref para o áudio de resposta correta
 
@@ -292,12 +294,18 @@ export default defineComponent({
       window.addEventListener('keydown', handleKeyDown);
       nextTick(() => {
         updateImageDimensions();
+        if (imageDisplayRef.value) {
+          imageDisplayResizeObserver = new ResizeObserver(updateImageDimensions);
+          imageDisplayResizeObserver.observe(imageDisplayRef.value);
+        }
       });
     });
 
     onUnmounted(() => {
       window.removeEventListener('resize', updateImageDimensions);
       window.removeEventListener('keydown', handleKeyDown);
+      imageDisplayResizeObserver?.disconnect();
+      imageDisplayResizeObserver = null;
       stopTypingAndAudio();
       if (fireworksTimeout) {
         clearTimeout(fireworksTimeout);
@@ -373,17 +381,18 @@ export default defineComponent({
 <style scoped>
 /* REMOVIDO: Estilos globais para html, body, e box-sizing. Agora estão em App.vue. */
 
-.game-active-section {
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* CENTRALIZA O CONTEÚDO VERTICALMENTE */
-  align-items: center;
+.game-active-section.main-content-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) clamp(10rem, 22vh, 15rem);
+  align-items: stretch;
+  justify-items: center;
   width: 100%;
   height: 100%; /* Ocupa 100% da altura do PARENT (agora, o main-content-area flexível) */
   overflow: hidden; /* Garante que NADA transborde deste container */
   box-sizing: border-box;
-  padding: 10px;
-  gap: 20px;
+  padding: 0;
+  gap: 0;
 }
 
 .full-content-area {
@@ -397,13 +406,16 @@ export default defineComponent({
 }
 
 .hint-container {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
   /* flex-grow: 1; REMOVIDO - para que a altura seja definida pelo conteúdo */
   width: 100%;
   max-width: 1200px;
   background-color: #fcfcfc;
   border-radius: 22.5px;
   box-shadow: 0 9px 22.5px rgba(0, 0, 0, 0.1);
-  padding: 60px;
+  padding: clamp(1rem, 3vh, 3.75rem);
   text-align: center;
   box-sizing: border-box;
   border: 1.5px solid #e0e0e0;
@@ -412,30 +424,32 @@ export default defineComponent({
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  margin-top: 200px;
+  margin: 0;
+  max-height: 100%;
+  overflow: hidden;
   /* margin-top: auto; REMOVIDO - centralização feita pelo pai */
   /* margin-bottom: auto; REMOVIDO - centralização feita pelo pai */
 }
 
 .hint-label {
-  font-size: 2.2em;
+  font-size: clamp(1.25rem, 2.5vh, 2.2rem);
   font-weight: 500;
   color: #7f8c8d;
-  margin-bottom: 30px;
+  margin-bottom: clamp(0.75rem, 2vh, 1.875rem);
   text-transform: uppercase;
   letter-spacing: 2.5px;
 }
 
 .hint-content {
   font-family: 'monospace', 'Courier New', Courier, monospace;
-  font-size: 5.5em;
+  font-size: clamp(2rem, 6vh, 5.5rem);
   font-weight: 600;
   color: #2c3e50;
-  margin-bottom: 60px;
+  margin: 0;
   line-height: 1.2;
   white-space: pre-wrap;
   word-break: break-word;
-  min-height: 6em; /* AQUI ESTÁ A ALTERAÇÃO: Aumentado o min-height para garantir espaço vertical */
+  min-height: 0;
 }
 
 .blinking-cursor {
@@ -451,9 +465,11 @@ export default defineComponent({
 }
 
 .image-display {
-  flex-grow: 1;
-  flex-shrink: 1; /* Permite que o item encolha */
+  grid-column: 1;
+  grid-row: 1;
   min-height: 0;  /* Permite que ele encolha abaixo do tamanho de seu conteúdo */
+  height: 90%;
+  align-self: center;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -480,12 +496,11 @@ export default defineComponent({
 }
 
 .game-info-text {
-  font-size: 3.2em; /* AQUI ESTÁ A ALTERAÇÃO: Aumentado o font-size */
+  font-size: clamp(1.5rem, 3.2vw, 3.2rem);
   color: #34495e;
   font-weight: 500;
   text-align: center;
   width: 100%;
-  flex-shrink: 0; /* Impede que esses elementos encolham */
   min-height: 1.2em; /* Garante que o elemento ocupe um mínimo de altura */
 }
 
@@ -499,13 +514,25 @@ export default defineComponent({
 .answer-feedback-wrapper {
   /* ESTE É O NOVO BLOCO CSS CHAVE */
   /* Ajuste este min-height conforme a altura que o AnswerFeedback ocupa quando visível */
-  min-height: 100px; /* Valor exemplo. Inspecione o AnswerFeedback para um valor preciso. */
+  min-height: clamp(4.5rem, 9vh, 6.25rem);
   display: flex; /* Para centralizar o AnswerFeedback quando visível */
   justify-content: center;
   align-items: center;
-  flex-shrink: 0; /* Impede que o wrapper encolha */
   width: 100%; /* Ocupa a largura total para alinhamento */
   box-sizing: border-box;
+}
+
+.bottom-content-area {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1vh 1vw;
+  overflow: hidden;
 }
 
 .finished-status-container {

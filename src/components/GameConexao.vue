@@ -5,13 +5,15 @@
 
     <!-- Imagem da Conexão -->
     <div class="image-display-area">
-      <img
-          v-if="currentRoundConexao?.imageUrl"
-          :src="baseURL + currentRoundConexao.imageUrl"
-          alt="Conexao"
-          class="game-image"
-          :style="{ border: imageBorderColor ? '10px solid ' + imageBorderColor : 'none' }"
-      />
+      <div class="connection-image-frame">
+        <img
+            v-if="currentRoundConexao?.imageUrl"
+            :src="baseURL + currentRoundConexao.imageUrl"
+            alt="Conexao"
+            class="game-image"
+            :style="{ border: imageBorderColor ? '10px solid ' + imageBorderColor : 'none' }"
+        />
+      </div>
     </div>
 
     <!-- ÁREA PARA PONTOS, PALAVRA E CONTROLES -->
@@ -246,26 +248,30 @@ export default defineComponent({
 <style scoped>
 /* Seu CSS existente (sem alterações significativas aqui) */
 .game-conexao-container {
-  position: fixed;
-  top: var(--header-height, 75px);
-  left: 0;
-  width: 100vw;
-  height: calc(100vh - var(--header-height, 80px));
+  position: relative;
+  width: 100%;
+  height: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 100vw;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) clamp(10rem, 22vh, 15rem);
   box-sizing: border-box;
   background-color: #f0f2f5;
   font-family: 'Poppins', sans-serif;
   overflow: hidden;
-  z-index: 100;
   padding: 0;
 }
 
 .image-display-area {
+  grid-column: 1;
+  grid-row: 1;
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 90%;
+  align-self: center;
+  min-height: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -275,12 +281,21 @@ export default defineComponent({
   box-shadow: none;
 }
 
+.connection-image-frame {
+  height: 100%;
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
 .game-image {
   position: relative;
-  width: auto;
+  width: 100%;
   height: 100%;
-  max-width: 100%;
-  object-fit: contain;
+  object-fit: fill;
   display: block;
   z-index: 1;
   transition: border 0.2s ease-in-out;
@@ -293,6 +308,8 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
+  height: 100%;
+  min-height: 0;
   box-sizing: border-box;
   padding: 1vh 1vw;
 }

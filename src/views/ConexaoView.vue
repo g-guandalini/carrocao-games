@@ -135,7 +135,9 @@ export default defineComponent({
   padding: 0;
   font-family: 'Poppins', sans-serif;
   background-color: #f0f2f5;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
   color: #333;
   width: 100%;
 }
@@ -147,7 +149,8 @@ export default defineComponent({
 }
 
 .scoreboard-area-layout {
-  flex-grow: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   width: 100%;
   display: flex;

@@ -61,8 +61,8 @@ export default defineComponent({
 }
 
 html, body {
-  height: 100vh; /* Ocupa 100% da altura da viewport */
-  width: 100vw;  /* Ocupa 100% da largura da viewport */
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden !important; /* FORÇA a ocultar qualquer rolagem */
@@ -78,19 +78,23 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  height: 100%; /* Ocupa 100% da altura do body (que é 100vh) */
-  width: 100%; /* Ocupa 100% da largura do body (que é 100vw) */
+  height: 100dvh;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden; /* Garante que o app em si não tenha rolagem */
 }
 
 /* NOVO ESTILO PARA O WRAPPER */
 .main-content-wrapper {
-  flex-grow: 1; /* Permite que este wrapper ocupe o espaço vertical disponível */
+  flex: 1 1 auto;
   display: flex;
   /* Não centralize o conteúdo horizontalmente aqui, deixe o router-view (e seus componentes)
      decidirem sua própria centralização, como ImagemOcultaView com o .main-content-area */
   /* justify-content: center; */ 
   width: 100%; /* Garante que o wrapper ocupe a largura total do #app */
+  min-width: 0;
+  min-height: 0;
   overflow: hidden; /* Importante para cortar conteúdo excedente se router-view transbordar */
 }
 </style>

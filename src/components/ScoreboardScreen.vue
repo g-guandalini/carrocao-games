@@ -1,5 +1,12 @@
 <template>
-  <div class="scoreboard-screen-container" tabindex="0" @keydown.space.stop.prevent="handleNextRound">
+  <div class="scoreboard-screen-container" tabindex="0">
+    <header class="scoreboard-heading">
+      <span class="heading-line"></span>
+      <div>
+        <h1>Placar</h1>
+      </div>
+      <span class="heading-line"></span>
+    </header>
     <ScoreboardBlocks :score="sortedScores" />
     <GameActionButtons
       :game-status="gameStatus"
@@ -15,6 +22,7 @@ import ScoreboardBlocks from './ScoreboardBlocks.vue';
 import GameActionButtons from './GameActionButtons.vue';
 import { GameStatus }  from '../types';
 import { scoreStore } from '../store/scoreStore';
+import { matchesShortcut } from '../store/shortcutStore';
 
 // Define a type for a score item, assuming it has at least a 'score' property for sorting
 interface ScoreItem {
@@ -59,8 +67,11 @@ export default defineComponent({
     });
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (matchesShortcut(event, 'general_escape', 'Escape')) {
         emit('exit-scoreboard');
+      } else if (matchesShortcut(event, 'general_space', 'Space')) {
+        event.preventDefault();
+        handleNextRound();
       }
     };
 
@@ -97,18 +108,46 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(1rem, 3vh, 2.5rem);
-  background-color: #f8f9fa;
-  border-radius: 15px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  padding: clamp(1rem, 3vh, 2.5rem) clamp(1rem, 3vw, 3.5rem);
+  background: transparent;
+  border-radius: 22px;
+  box-shadow: none;
   margin: 0;
-  width: min(94vw, 1000px);
+  width: min(96vw, 1240px);
   max-height: 100%;
-  max-width: 1000px; /* AUMENTADO PARA 1000px */
+  max-width: 1240px;
   text-align: center;
   position: relative;
   overflow: hidden;
-  border: 1px solid #e0e0e0;
+  border: 0;
+}
+
+.scoreboard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  color: #2c3e50;
+}
+
+.scoreboard-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heading-line {
+  height: 2px;
+  flex: 1;
+  max-width: 180px;
+  background: linear-gradient(90deg, transparent, #cbd5e0);
+}
+
+.heading-line:last-child {
+  background: linear-gradient(90deg, #cbd5e0, transparent);
 }
 
 .scoreboard-screen-container:focus {

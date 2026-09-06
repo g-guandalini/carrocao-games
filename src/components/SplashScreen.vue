@@ -17,6 +17,7 @@ import { resetImagemOcultaGameScores } from '../store/imagemOcultaStore';
 import { resetConexaoGameScores } from '../store/conexaoStore'; 
 import { resetBugGameScores } from '../store/bugStore'; 
 import { useRouter } from 'vue-router'; 
+import { matchesShortcut } from '../store/shortcutStore';
 
 // Interface para as partículas dos fogos de artifício
 interface Particle {
@@ -73,6 +74,10 @@ export default defineComponent({
       router.push({ name: 'AdminDefaultRedirect' }); 
     };
 
+    const navigateToScoreboard = () => {
+      router.push({ name: 'Scoreboard' });
+    };
+
     // --- Lógica dos Fogos de Artifício ---
     let fireworksCanvasElement: HTMLCanvasElement | null = null;
     let ctx: CanvasRenderingContext2D | null = null;
@@ -80,31 +85,32 @@ export default defineComponent({
     let animationFrameId: number | null = null;
 
     // Mapeamento de teclas para cores dos fogos
-    const FIREWORK_COLORS: { [key: string]: string } = {
-      '1': '#3498db', // Azul
-      '2': '#e74c3c', // Vermelho
-      '3': '#2ecc71', // Verde
-      '4': '#f1c40f', // Amarelo
-    };
+    const FIREWORK_COLORS = [
+      { code: 'team_blue', fallback: '1', color: '#3498db' },
+      { code: 'team_red', fallback: '2', color: '#e74c3c' },
+      { code: 'team_green', fallback: '3', color: '#2ecc71' },
+      { code: 'team_yellow', fallback: '4', color: '#f1c40f' },
+    ];
 
     // Mapeamento de teclas para ações (incluindo 'A' para Admin)
-    const ACTION_KEYS: { [key: string]: () => void } = {
-      'A': () => navigateToAdmin(), 
-      'C': () => navigateToGame('conexao'), 
-      'I': () => navigateToGame('imagem-oculta'), 
-      'B': () => { 
+    const ACTION_KEYS: { code: string; fallback: string; action: () => void }[] = [
+      { code: 'home_admin', fallback: 'A', action: () => navigateToAdmin() },
+      { code: 'home_conexao', fallback: 'C', action: () => navigateToGame('conexao') },
+      { code: 'home_imagem_oculta', fallback: 'I', action: () => navigateToGame('imagem-oculta') },
+      { code: 'home_bug', fallback: 'B', action: () => {
         console.log("Bug action triggered via key 'B'. Navigating to BugGame.");
         navigateToGame('bug');
-      },
-      'L': () => { 
+      } },
+      { code: 'home_clear_scores', fallback: 'L', action: () => {
         if (hasScoresToClear.value) {
             clearAllScores(); 
             console.log("Scores cleared via key 'L'.");
         } else {
             console.log("No scores to clear (key 'L' pressed).");
         }
-      },
-    };
+      } },
+      { code: 'general_scoreboard', fallback: 'P', action: () => navigateToScoreboard() },
+    ];
 
     // Função auxiliar para converter HEX para RGB
     const hexToRgb = (hex: string): string => {
@@ -211,10 +217,8 @@ export default defineComponent({
 
     // Lida com o evento de pressionar uma tecla
     const handleKeyPress = (event: KeyboardEvent) => {
-      const key = event.key.toUpperCase(); 
-
       // Verifica se é uma tecla de fogos de artifício
-      const fireworkColor = FIREWORK_COLORS[key];
+      const fireworkColor = FIREWORK_COLORS.find(item => matchesShortcut(event, item.code, item.fallback))?.color;
       if (fireworkColor) {
         triggerFireworks(fireworkColor);
         event.preventDefault(); 
@@ -222,9 +226,9 @@ export default defineComponent({
       }
 
       // Verifica se é uma tecla de ação
-      const action = ACTION_KEYS[key];
+      const action = ACTION_KEYS.find(item => matchesShortcut(event, item.code, item.fallback));
       if (action) {
-        action();
+        action.action();
         event.preventDefault(); 
         return;
       }
@@ -252,6 +256,7 @@ export default defineComponent({
       clearAllScores,
       navigateToGame,
       navigateToAdmin,
+      navigateToScoreboard,
     };
   },
 });

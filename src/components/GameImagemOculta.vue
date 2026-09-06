@@ -71,6 +71,7 @@ import ToastNotification from './ToastNotification.vue';
 import AnswerFeedback from './AnswerFeedback.vue';
 import FireworksCanvas from './FireworksCanvas.vue';
 import { Character, GameStatus, TeamColor } from '../types';
+import { matchesShortcut } from '../store/shortcutStore';
 import {
   proceedToRevealImagemOculta,
   viewImagemOcultaScoreboard
@@ -243,18 +244,18 @@ export default defineComponent({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (_props.gameStatus === 'finished') {
-        if (event.code === 'Space') {
+        if (matchesShortcut(event, 'general_space', 'Space')) {
           event.preventDefault();
           emit('start-new-round-imagem-oculta');
           return;
-        } else if (event.key.toLowerCase() === 'p') {
+        } else if (matchesShortcut(event, 'general_scoreboard', 'P')) {
           event.preventDefault();
           viewImagemOcultaScoreboard();
           return;
         }
       }
 
-      if (event.code === 'Space' && _props.gameStatus === 'hint') {
+      if (matchesShortcut(event, 'general_space', 'Space') && _props.gameStatus === 'hint') {
         event.preventDefault();
         stopTypingAndProceed();
         return;

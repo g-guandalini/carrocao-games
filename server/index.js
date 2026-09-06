@@ -10,6 +10,8 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const imagemOcultaRoutes = require('./routes/imagemOcultaRoutes');
 const conexaoRoutes = require('./routes/conexaoRoutes');
 const bugRoutes = require('./routes/bugRoutes'); // Importar as novas rotas do BUG
+const hidRoutes = require('./routes/hidRoutes');
+const shortcutRoutes = require('./routes/shortcutRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -161,8 +163,8 @@ app.post('/api/scores/reset', async (req, res) => {
     const db = getDb();
     if (!db) { return res.status(500).json({ error: 'Banco de dados não inicializado.' }); }
     try {
-        const result = await runAsync("UPDATE scores SET points = 0", []);
-        res.json({ message: 'Todas as pontuações foram resetadas para 0.', changes: result.changes });
+        const result = await runAsync("UPDATE scores SET points = 100", []);
+        res.json({ message: 'Todas as pontuações foram resetadas para 100.', changes: result.changes });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -170,6 +172,8 @@ app.use('/api/admin/categories', categoryRoutes);
 app.use('/api', imagemOcultaRoutes);
 app.use('/api', conexaoRoutes);
 app.use('/api', bugRoutes); // Usar as novas rotas do BUG
+app.use('/api', hidRoutes);
+app.use('/api', shortcutRoutes);
 
 
 // --- Servir arquivos estáticos do frontend (JS, CSS, imagens de assets) ---

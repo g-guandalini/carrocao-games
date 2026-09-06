@@ -66,6 +66,7 @@
 <script lang="ts">
 import { defineComponent, ref, PropType, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { TeamColor } from '../types';
+import { matchesShortcut } from '../store/shortcutStore';
 
 export default defineComponent({
   name: 'BugDrawPhase',
@@ -96,10 +97,10 @@ export default defineComponent({
     const bugPhaseContainer = ref<HTMLElement | null>(null);
     const sorteioAudio = ref<HTMLAudioElement | null>(null);
 
-    const teamsOrder = [TeamColor.RED, TeamColor.BLUE, TeamColor.GREEN, TeamColor.YELLOW];
+    const teamsOrder = [TeamColor.BLUE, TeamColor.RED, TeamColor.GREEN, TeamColor.YELLOW];
     const teamKeyMap: { [key: string]: TeamColor } = {
-      '1': TeamColor.RED,
-      '2': TeamColor.BLUE,
+      '1': TeamColor.BLUE,
+      '2': TeamColor.RED,
       '3': TeamColor.GREEN,
       '4': TeamColor.YELLOW,
     };
@@ -120,6 +121,7 @@ export default defineComponent({
       '4': 40,
       '5': 50,
     };
+    const bugDigit = (event: KeyboardEvent, number: string) => matchesShortcut(event, `bug_digit_${number}`, number);
 
     const orderedRoundOptions = computed(() => {
       const order = ['Ganhe 20', 'Perca 20', 'Fora', '10 a 50', 'Tire uma', 'Tire duas'];
@@ -343,20 +345,23 @@ export default defineComponent({
 
       if (selectedOption.value) {
         if (selectedOption.value === '10 a 50') {
-          const points = pointKeyMap[event.key];
+          const points = Object.entries(pointKeyMap).find(([number]) => bugDigit(event, number))?.[1];
           if (points) {
             event.preventDefault();
             togglePointSelection(points);
-          } else if (event.code === 'Space') {
+          } else if (matchesShortcut(event, 'general_space', 'Space')) {
             event.preventDefault();
             confirmPoints();
           }
         } else if (selectedOption.value === 'Tire uma' || selectedOption.value === 'Tire duas') {
-          const team = teamKeyMap[event.key];
+          const team = Object.entries(teamKeyMap).find(([number]) => {
+            const code = number === '1' ? 'team_blue' : number === '2' ? 'team_red' : number === '3' ? 'team_green' : 'team_yellow';
+            return matchesShortcut(event, code, number);
+          })?.[1];
           if (team) {
             event.preventDefault();
             toggleTeamSelection(team);
-          } else if (event.code === 'Space') {
+          } else if (matchesShortcut(event, 'general_space', 'Space')) {
             event.preventDefault();
             const limit = selectedOption.value === 'Tire uma' ? 1 : 2;
             if (selectedTeamsToRemove.value.length === limit) {
@@ -364,26 +369,26 @@ export default defineComponent({
             }
           }
         } else if (selectedOption.value === 'Ganhe 20' || selectedOption.value === 'Perca 20') {
-          if (event.code === 'Space') {
+          if (matchesShortcut(event, 'general_space', 'Space')) {
             event.preventDefault();
             // Emite um evento combinado para aplicar pontos e iniciar nova rodada
             emit('option-confirmed-and-next-action', selectedOption.value, chosenPoints.value, 'newRound');
-          } else if (event.key === 'p' || event.key === 'P') {
+          } else if (matchesShortcut(event, 'general_scoreboard', 'P')) {
             event.preventDefault();
             // Emite um evento combinado para aplicar pontos e ir para o placar
             emit('option-confirmed-and-next-action', selectedOption.value, chosenPoints.value, 'scoreboard');
           }
         } else { // Cobre 'Fora' e outras opções simples que só precisam de ESPAÇO para confirmar
-          if (event.code === 'Space') {
+          if (matchesShortcut(event, 'general_space', 'Space')) {
             event.preventDefault();
             confirmDrawnOption();
           }
         }
       } else { // Nenhuma opção selecionada ainda, fase de sorteio inicial
-        if (event.key === 's' || event.key === 'S') {
+        if (matchesShortcut(event, 'bug_sorteio', 'S')) {
           drawRandomOption();
         } else {
-          const manualOption = optionKeyMap[event.key];
+          const manualOption = Object.entries(optionKeyMap).find(([number]) => bugDigit(event, number))?.[1];
           if (manualOption) {
             event.preventDefault();
             if (props.roundOptions.includes(manualOption)) {

@@ -13,7 +13,8 @@ const getFullPath = (imagePath) => {
     if (!imagePath || !imagePath.startsWith('/conexao_images/')) {
         return null;
     }
-    return path.join(__dirname, '..', '..', 'public', imagePath);
+    const dataPath = process.env.GAME_DATA_PATH || path.join(__dirname, '..', '..');
+    return path.join(dataPath, 'public', imagePath.replace(/^\/+/, ''));
 };
 
 // Função auxiliar para formatar itens de Conexão com suas categorias

@@ -46,6 +46,7 @@ import {
 } from '../store/conexaoStore';
 import { TeamColor } from '../types';
 import { useRouter } from 'vue-router';
+import { matchesShortcut } from '../store/shortcutStore';
 
 import GameHeader from '../components/GameHeader.vue';
 import ScoreboardScreen from '../components/ScoreboardScreen.vue';
@@ -69,12 +70,10 @@ export default defineComponent({
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (conexaoStore.gameStatus === 'revealing') {
         let selectedTeam: TeamColor | null = null;
-        switch (event.key) {
-          case '1': selectedTeam = TeamColor.BLUE; break;
-          case '2': selectedTeam = TeamColor.RED; break;
-          case '3': selectedTeam = TeamColor.GREEN; break;
-          case '4': selectedTeam = TeamColor.YELLOW; break;
-        }
+        if (matchesShortcut(event, 'team_blue', '1')) selectedTeam = TeamColor.BLUE;
+        else if (matchesShortcut(event, 'team_red', '2')) selectedTeam = TeamColor.RED;
+        else if (matchesShortcut(event, 'team_green', '3')) selectedTeam = TeamColor.GREEN;
+        else if (matchesShortcut(event, 'team_yellow', '4')) selectedTeam = TeamColor.YELLOW;
 
         if (selectedTeam) {
           event.preventDefault();

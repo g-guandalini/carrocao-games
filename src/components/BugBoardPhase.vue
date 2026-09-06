@@ -34,6 +34,7 @@
 <script lang="ts">
 import { defineComponent, PropType, computed, onMounted, onUnmounted, nextTick, ref } from 'vue';
 import { BugBoard, TeamColor, BoardValue } from '../types';
+import { matchesShortcut } from '../store/shortcutStore';
 
 export default defineComponent({
   name: 'BugBoardPhase',
@@ -109,12 +110,12 @@ export default defineComponent({
     const handleKeyDown = (event: KeyboardEvent) => {
       // NOVO: Lógica para barra de espaço e 'P' quando awaitingTileConfirmation é true
       if (props.awaitingTileConfirmation) {
-        if (event.key === ' ') {
+        if (matchesShortcut(event, 'general_space', 'Space')) {
           event.preventDefault(); // Previne o scroll da página
           emit('start-new-round-shortcut'); // Emite o novo evento para iniciar nova rodada
           clearFirstKey();
           return;
-        } else if (event.key.toLowerCase() === 'p') {
+        } else if (matchesShortcut(event, 'general_scoreboard', 'P')) {
           event.preventDefault(); // Previne ação padrão da tecla 'P'
           emit('view-scoreboard-shortcut'); // Emite o novo evento para ir ao placar
           clearFirstKey();
@@ -131,16 +132,16 @@ export default defineComponent({
         return;
       }
 
-      const key = event.key.toLowerCase();
-      const rowLabels = ['a', 'b', 'c', 'd']; // Baseado nas 4 linhas (A, B, C, D)
-      const colNumbers = ['1', '2', '3', '4', '5']; // Baseado nas 5 colunas (1, 2, 3, 4, 5)
+      const rowLabels = ['a', 'b', 'c', 'd'];
+      const colNumbers = ['1', '2', '3', '4', '5'];
+      const pressedColumn = colNumbers.find(number => matchesShortcut(event, `board_digit_${number}`, number));
 
       // Se uma tecla de linha foi previamente pressionada
       if (firstKeyPressed.value) {
         // Verifica se a tecla atual é um número de coluna
-        if (colNumbers.includes(key)) {
+        if (pressedColumn) {
           const rowKey = firstKeyPressed.value;
-          const colKey = parseInt(key);
+          const colKey = parseInt(pressedColumn);
 
           const rowIndex = rowKey.charCodeAt(0) - 'a'.charCodeAt(0);
           const colIndex = colKey - 1;
@@ -162,8 +163,9 @@ export default defineComponent({
       }
 
       // Se nenhuma primeira tecla foi pressionada, ou foi limpa, verifica se a tecla atual é uma letra de linha
-      if (rowLabels.includes(key)) {
-        firstKeyPressed.value = key;
+      const pressedRow = rowLabels.find(row => matchesShortcut(event, `board_row_${row}`, row));
+      if (pressedRow) {
+        firstKeyPressed.value = pressedRow;
         // Inicia um timeout para limpar firstKeyPressed se nenhum número de coluna seguir
         if (firstKeyTimeout) {
           clearTimeout(firstKeyTimeout);

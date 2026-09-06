@@ -5,6 +5,11 @@ const fs = require('fs');
 
 // Exporta uma função que cria uma instância do Multer configurada para uma pasta específica
 module.exports = (folderName) => {
+    // No Electron, os arquivos graváveis ficam em GAME_DATA_PATH/public.
+    // Em desenvolvimento, quando a variável não existe, mantém a pasta
+    // public do projeto como antes.
+    const dataPath = process.env.GAME_DATA_PATH || path.join(__dirname, '..', '..');
+
     // Define onde e como os arquivos serão armazenados
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
@@ -14,7 +19,7 @@ module.exports = (folderName) => {
             // '..' -> `Project Root`
             // 'public' -> `Project Root/public`
             // folderName -> `Project Root/public/${folderName}`
-            const uploadPath = path.join(__dirname, '..', '..', 'public', folderName); 
+            const uploadPath = path.join(dataPath, 'public', folderName);
             
             // Garante que o diretório exista. Se não existir, ele é criado.
             fs.mkdirSync(uploadPath, { recursive: true });

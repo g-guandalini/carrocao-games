@@ -38,6 +38,16 @@
             </router-link>
           </li>
           <li>
+            <router-link :to="{ name: 'AdminHid' }" class="nav-link">
+              <i class="fas fa-gamepad"></i> Botoeira
+            </router-link>
+          </li>
+          <li>
+            <router-link :to="{ name: 'AdminShortcuts' }" class="nav-link">
+              <i class="fas fa-keyboard"></i> Atalhos
+            </router-link>
+          </li>
+          <li>
             <a :href="backupUrl" class="nav-link backup-link" download>
               <i class="fas fa-download"></i> Backup
             </a>
@@ -140,6 +150,7 @@ html, body {
 
 .admin-sidebar {
   width: 250px;
+  flex: 0 0 250px;
   background-color: #363435;
   color: #ecf0f1;
   padding: 0;
@@ -243,6 +254,7 @@ html, body {
 
 .admin-content {
   flex-grow: 1;
+  min-width: 0;
   height: 100%;
   overflow-y: auto;
   display: flex;
@@ -251,6 +263,7 @@ html, body {
 
 .admin-content-wrapper {
   flex-grow: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 30px;
@@ -274,5 +287,90 @@ html, body {
   border-radius: 10px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   flex-grow: 1;
+}
+
+@media (max-width: 800px) {
+  .admin-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    flex: 0 0 auto;
+    height: auto;
+  }
+
+  .sidebar-header {
+    padding: 10px 16px;
+  }
+
+  .sidebar-logo {
+    max-width: 140px;
+  }
+
+  .sidebar-nav-main {
+    padding: 6px 0;
+    overflow: visible;
+  }
+
+  .sidebar-nav-main ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .sidebar-nav-main li {
+    margin-bottom: 0;
+  }
+
+  .nav-link {
+    padding: 10px 12px;
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+
+  .sidebar-bottom-action {
+    padding: 6px 0;
+  }
+
+  .sidebar-footer {
+    padding: 10px 16px;
+    font-size: 0.8em;
+  }
+
+  .admin-content {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .admin-content-wrapper {
+    padding: 16px;
+  }
+
+  .admin-content-header {
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+  }
+
+  .page-title {
+    font-size: clamp(1.5em, 5vw, 2em);
+  }
+
+  .admin-content-body {
+    padding: 16px;
+  }
+
+  :deep(table) {
+    table-layout: fixed;
+    max-width: 100%;
+  }
+
+  :deep(th),
+  :deep(td) {
+    overflow-wrap: anywhere;
+  }
 }
 </style>

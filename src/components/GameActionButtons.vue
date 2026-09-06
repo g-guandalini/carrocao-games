@@ -3,6 +3,7 @@
 </template>
 
 <script lang="ts">
+import { matchesShortcut } from '../store/shortcutStore';
 import { defineComponent, PropType } from 'vue';
 import { GameStatus } from '../types'; // Importe o tipo GameStatus
 
@@ -27,10 +28,10 @@ export default defineComponent({
     handleKeyDown(event: KeyboardEvent) {
       // Verifica se o jogo está no estado onde os botões seriam visíveis/ativos
       if (this.gameStatus === 'finished' || this.gameStatus === 'scoreboard') {
-        if (event.code === 'Space') {
+        if (matchesShortcut(event, 'general_space', 'Space')) {
           event.preventDefault(); // Previne o comportamento padrão da tecla Espaço (como rolar a página)
           this.$emit('next-round');
-        } else if (event.code === 'Escape') {
+        } else if (matchesShortcut(event, 'general_escape', 'Escape')) {
           event.preventDefault(); // Previne o comportamento padrão da tecla Esc
           this.$emit('reset-game');
         }

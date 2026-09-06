@@ -12,6 +12,39 @@ try {
 const path = require('path');
 const fs = require('fs');
 
+const INITIAL_SHORTCUTS = [
+    ['home_admin', 'Entrada no ADM', 'Inicialização', 'A'],
+    ['home_imagem_oculta', 'Iniciar Imagem Oculta', 'Inicialização', 'I'],
+    ['home_conexao', 'Iniciar Conexão', 'Inicialização', 'C'],
+    ['home_bug', 'Iniciar BUG', 'Inicialização', 'B'],
+    ['home_clear_scores', 'Limpar pontuações', 'Inicialização', 'L'],
+    ['general_space', 'Confirmar / Próxima rodada', 'Geral', 'Space'],
+    ['general_escape', 'Voltar / Sair', 'Geral', 'Escape'],
+    ['general_scoreboard', 'Abrir placar', 'Geral', 'P'],
+    ['feedback_correct', 'Resposta correta', 'Resposta', 'O'],
+    ['feedback_wrong', 'Resposta errada', 'Resposta', 'X'],
+    ['team_blue', 'Equipe Azul', 'Equipes', '1'],
+    ['team_red', 'Equipe Vermelha', 'Equipes', '2'],
+    ['team_green', 'Equipe Verde', 'Equipes', '3'],
+    ['team_yellow', 'Equipe Amarela', 'Equipes', '4'],
+    ['bug_sorteio', 'Sortear opção', 'BUG - Sorteio', 'S'],
+    ['bug_digit_1', 'Tecla 1 (opções/equipe)', 'BUG - Sorteio', '1'],
+    ['bug_digit_2', 'Tecla 2 (opções/equipe)', 'BUG - Sorteio', '2'],
+    ['bug_digit_3', 'Tecla 3 (opções/equipe)', 'BUG - Sorteio', '3'],
+    ['bug_digit_4', 'Tecla 4 (opções/equipe)', 'BUG - Sorteio', '4'],
+    ['bug_digit_5', 'Tecla 5 (opções/pontos)', 'BUG - Sorteio', '5'],
+    ['bug_digit_6', 'Tecla 6 (opções)', 'BUG - Sorteio', '6'],
+    ['board_row_a', 'Linha A', 'BUG - Tabuleiro', 'A'],
+    ['board_row_b', 'Linha B', 'BUG - Tabuleiro', 'B'],
+    ['board_row_c', 'Linha C', 'BUG - Tabuleiro', 'C'],
+    ['board_row_d', 'Linha D', 'BUG - Tabuleiro', 'D'],
+    ['board_digit_1', 'Coluna 1', 'BUG - Tabuleiro', '1'],
+    ['board_digit_2', 'Coluna 2', 'BUG - Tabuleiro', '2'],
+    ['board_digit_3', 'Coluna 3', 'BUG - Tabuleiro', '3'],
+    ['board_digit_4', 'Coluna 4', 'BUG - Tabuleiro', '4'],
+    ['board_digit_5', 'Coluna 5', 'BUG - Tabuleiro', '5'],
+];
+
 // No Electron, os dados ficam fora do pacote da aplicação para continuarem
 // graváveis e sobreviverem a atualizações. Fora dele, mantém o local legado.
 const DB_PATH = process.env.GAME_DB_PATH || path.join(__dirname, 'db', 'game.db');
@@ -220,6 +253,43 @@ async function createTables() {
         `);
         console.log('Tabela "scores" criada ou já existe.');
 
+        // Dispositivos e mapeamentos da botoeira (SDL/Pygame)
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS hid_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                identifier TEXT UNIQUE,
+                driver_type TEXT NOT NULL DEFAULT 'sdl',
+                enabled INTEGER NOT NULL DEFAULT 1
+            );
+        `);
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS hid_mappings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER,
+                name TEXT NOT NULL,
+                input_code TEXT NOT NULL,
+                output_key TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (device_id) REFERENCES hid_devices(id) ON DELETE CASCADE,
+                UNIQUE (device_id, input_code)
+            );
+        `);
+        console.log('Tabelas "hid_devices" e "hid_mappings" criadas ou já existem.');
+
+        await runAsync(`
+            CREATE TABLE IF NOT EXISTS shortcuts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                context TEXT NOT NULL,
+                key_value TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                UNIQUE (context, key_value)
+            );
+        `);
+        console.log('Tabela "shortcuts" criada ou já existe.');
+
         // =========================================================
         //                 NOVAS TABELAS PARA CONEXÃO (COM order_idx)
         // =========================================================
@@ -333,6 +403,13 @@ async function createTables() {
  * A lógica de ALTER TABLE foi movida para createTables para maior robustez.
  */
 async function seedInitialData() {
+    for (const [code, label, context, keyValue] of INITIAL_SHORTCUTS) {
+        await runAsync(
+            'INSERT OR IGNORE INTO shortcuts (code, label, context, key_value, enabled) VALUES (?, ?, ?, ?, 1)',
+            [code, label, context, keyValue]
+        );
+    }
+
     // Categorias iniciais para teste
     const initialCategories = ['Personagens', 'Animais', 'Objetos', 'Comida', 'Geral']; // Adicionei 'Geral'
     const categoryCountRow = await getAsync("SELECT COUNT(*) AS count FROM categories");

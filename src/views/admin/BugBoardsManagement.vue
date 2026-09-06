@@ -131,7 +131,7 @@ export default defineComponent({
     const sortColumn = ref<string>(''); 
     const sortDirection = ref<'asc' | 'desc'>('asc'); 
 
-    const baseURL = import.meta.env.VITE_API_BASE_URL; 
+    const baseURL = import.meta.env.VITE_API_BASE_URL || '';
 
     const API_BASE_URL = baseURL + '/api/admin'; 
     const BUG_BOARDS_API_URL = `${API_BASE_URL}/bug/boards`;

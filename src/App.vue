@@ -38,9 +38,63 @@ export default defineComponent({
     loadShortcuts().catch(error => console.warn('[Atalhos] Não foi possível carregar configurações:', error));
     let hidSequence = 0;
     let hidTimer: ReturnType<typeof setInterval> | null = null;
+    let hidMappingTimer: ReturnType<typeof setInterval> | null = null;
+    let gamepadTimer: ReturnType<typeof setInterval> | null = null;
+    let hidMappings: { inputCode: string; outputKey: string; deviceIdentifier?: string | null; deviceName?: string | null }[] = [];
+    const previousGamepadButtons = new Map<string, boolean[]>();
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+
+    const loadHidMappings = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/hid/config`);
+        if (response.ok) hidMappings = await response.json();
+      } catch {
+        // O backend pode estar reiniciando; mantém a última configuração válida.
+      }
+    };
+
+    const findGamepadMapping = (gamepad: Gamepad, inputCode: string) => {
+      const candidates = hidMappings.filter(mapping => mapping.inputCode === inputCode);
+      const exact = candidates.find(mapping => mapping.deviceIdentifier === gamepad.id);
+      if (exact) return exact;
+      const normalizedName = gamepad.id.toLocaleLowerCase();
+      const named = candidates.find(mapping => {
+        const deviceName = mapping.deviceName?.toLocaleLowerCase();
+        return deviceName && (normalizedName.includes(deviceName) || deviceName.includes(normalizedName));
+      });
+      if (named) return named;
+      const generic = candidates.find(mapping => !mapping.deviceIdentifier && !mapping.deviceName);
+      return generic || (candidates.length === 1 ? candidates[0] : undefined);
+    };
+
+    const dispatchHidKey = (key: string) => {
+      const eventTarget = document.activeElement || document.body;
+      eventTarget.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    };
+
+    const pollGamepads = () => {
+      if (!navigator.getGamepads) return;
+      const gamepads = Array.from(navigator.getGamepads()).filter(Boolean) as Gamepad[];
+      const connectedKeys = new Set<string>();
+      for (const gamepad of gamepads) {
+        const gamepadKey = `${gamepad.index}:${gamepad.id}`;
+        connectedKeys.add(gamepadKey);
+        const previous = previousGamepadButtons.get(gamepadKey) || [];
+        gamepad.buttons.forEach((button, index) => {
+          if (!button.pressed || previous[index]) return;
+          const mapping = findGamepadMapping(gamepad, `button:${index}`);
+          if (mapping) dispatchHidKey(mapping.outputKey);
+        });
+        previousGamepadButtons.set(gamepadKey, gamepad.buttons.map(button => button.pressed));
+      }
+      for (const key of previousGamepadButtons.keys()) {
+        if (!connectedKeys.has(key)) previousGamepadButtons.delete(key);
+      }
+    };
+
     const pollHidEvents = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/hid/events?after=${hidSequence}`);
+        const response = await fetch(`${apiBaseUrl}/api/hid/events?after=${hidSequence}`);
         if (!response.ok) return;
         const events = await response.json() as { sequence: number; key: string }[];
         for (const hidEvent of events) {
@@ -48,15 +102,23 @@ export default defineComponent({
           // Dispara no elemento focado para atender tanto listeners em
           // `document`/`window` quanto as fases do BUG que usam @keydown no
           // próprio container focado.
-          const eventTarget = document.activeElement || document.body;
-          eventTarget.dispatchEvent(new KeyboardEvent('keydown', { key: hidEvent.key, bubbles: true }));
+          dispatchHidKey(hidEvent.key);
         }
       } catch {
         // O backend pode estar reiniciando; a próxima consulta tenta novamente.
       }
     };
-    onMounted(() => { hidTimer = setInterval(pollHidEvents, 50); });
-    onUnmounted(() => { if (hidTimer) clearInterval(hidTimer); });
+    onMounted(() => {
+      loadHidMappings();
+      hidMappingTimer = setInterval(loadHidMappings, 2000);
+      hidTimer = setInterval(pollHidEvents, 50);
+      gamepadTimer = setInterval(pollGamepads, 50);
+    });
+    onUnmounted(() => {
+      if (hidTimer) clearInterval(hidTimer);
+      if (hidMappingTimer) clearInterval(hidMappingTimer);
+      if (gamepadTimer) clearInterval(gamepadTimer);
+    });
 
     // **Para depuração:** Observe o objeto route para ver o que ele contém
     watchEffect(() => {

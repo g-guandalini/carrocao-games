@@ -2,7 +2,7 @@
 import { reactive } from 'vue';
 import { AdminState } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const initialState: AdminState = {
       categories: [],

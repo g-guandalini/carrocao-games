@@ -184,7 +184,7 @@
       const selectedFile = ref<File | null>(null); 
       const imagePreviewUrl = ref<string | null>(null); 
   
-      const baseURL = import.meta.env.VITE_API_BASE_URL; 
+      const baseURL = import.meta.env.VITE_API_BASE_URL || '';
   
       const API_BASE_URL = baseURL + '/api/admin'; 
       const CONEXAO_API_URL = `${API_BASE_URL}/conexao`; 

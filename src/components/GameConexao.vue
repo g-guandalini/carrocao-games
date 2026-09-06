@@ -96,7 +96,7 @@ export default defineComponent({
   emits: ['evaluate-guess', 'view-scoreboard', 'start-new-round'],
   setup(props, { emit }) {
 
-    const baseURL = import.meta.env.VITE_API_BASE_URL;
+    const baseURL = import.meta.env.VITE_API_BASE_URL || '';
 
     const imageBorderColor = ref('');
     const showGameFinishedOverlay = ref(false);

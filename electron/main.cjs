@@ -103,7 +103,12 @@ app.whenReady().then(async () => {
   startBackend();
   try {
     await waitForServer();
-    startHidController();
+    // O aplicativo lê a botoeira pela Gamepad API do próprio Electron, sem
+    // depender de Python/Pygame no computador instalado. O controlador Python
+    // continua disponível como fallback manual para ambientes especiais.
+    if (process.env.CARROCAO_HID_EXTERNAL === '1') {
+      startHidController();
+    }
     createWindow();
   } catch (error) {
     dialog.showErrorBox('Carroção Games', error.message);

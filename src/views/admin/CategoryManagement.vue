@@ -139,7 +139,7 @@ export default defineComponent({
     const sortDirection = ref<'asc' | 'desc'>('asc'); 
     // --- Fim Adição ---
 
-    const API_URL = import.meta.env.VITE_API_BASE_URL + '/api/admin/categories';
+    const API_URL = (import.meta.env.VITE_API_BASE_URL || '') + '/api/admin/categories';
 
     const fetchCategories = async () => {
       try {

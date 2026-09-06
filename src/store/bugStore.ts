@@ -4,7 +4,7 @@ import { BugGameState, TeamColor, GameStatus, BugWord, BugBoard } from '../types
 import { updateScore, setScore } from './scoreStore';
 
 const LOCAL_STORAGE_KEY = 'bugCurrentRoundState';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const initialBugState: BugGameState = { // Usando BugGameState
   gameStatus: 'idle', // 'idle', 'bug_draw_phase', 'bug_word_phase', 'bug_board_phase', 'scoreboard'

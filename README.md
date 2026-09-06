@@ -137,10 +137,12 @@ Os valores iniciais são os atalhos tradicionais descritos neste documento e
 as alterações são salvas no SQLite. Atalhos são únicos dentro de cada contexto
 (por exemplo, uma tecla não pode ser repetida entre duas ações da mesma fase).
 
-O menu `Botoeira` permite cadastrar controles e mapear entradas SDL/Pygame para
-teclas do jogo. O controlador unificado está em `hid/controle_hid.py` e lê sua
-configuração pela API local (`/api/hid/config`). Para executá-lo manualmente,
-instale `hid/requirements.txt` e inicie o backend antes:
+O menu `Botoeira` permite cadastrar controles e mapear entradas do Gamepad API
+para as teclas do jogo. No aplicativo Electron, a botoeira funciona diretamente
+sem exigir Python ou Pygame instalados na máquina. O controlador opcional em
+`hid/controle_hid.py` continua disponível para execução manual em ambientes que
+precisem da leitura via SDL/Pygame; nesse caso, instale `hid/requirements.txt` e
+inicie o backend antes:
 
 ```bash
 python -m pip install -r hid/requirements.txt

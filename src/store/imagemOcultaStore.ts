@@ -3,7 +3,7 @@ import { reactive, watch } from 'vue';
 import { ImagemOcultaGameState, TeamColor, Character, GameStatus, Category } from '../types'; 
 import { scoreStore, fetchScores, updateScore } from './scoreStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const LOCAL_STORAGE_PLAYED_CHARS_KEY = 'imagemOcultaGamePlayedChars';
 const LOCAL_STORAGE_CURRENT_ROUND_STATE_KEY = 'imagemOcultaCurrentRoundState';
 

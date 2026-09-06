@@ -3,7 +3,7 @@ import { reactive, watch, computed } from 'vue';
 import { ConexaoGameState, TeamColor, Conexao, GameStatus, Category } from '../types';
 import { scoreStore, fetchScores, updateScore } from './scoreStore'; // scoreStore é compartilhado
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const LOCAL_STORAGE_PLAYED_CONEXOES_KEY = 'conexaoGamePlayedConexoes';
 const LOCAL_STORAGE_CURRENT_CONEXAO_ROUND_STATE_KEY = 'conexaoCurrentRoundState';
 // LOCAL_STORAGE_SELECTED_CONEXAO_CATEGORIES_KEY removido, pois a seleção é automática

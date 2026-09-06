@@ -2,7 +2,7 @@
 import { reactive } from 'vue';
 import { TeamColor, ScoreState } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Estado inicial das pontuações (pode ser preenchido pela API)
 const initialScoreState: ScoreState = {

@@ -1,7 +1,7 @@
 {
   "name": "carrocao-games",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Jogos do Sítio do Carroção para telão",
   "author": "Guandalini",
   "desktopName": "carrocao-games",
@@ -19,11 +19,13 @@
     "render-start": "npm run start-backend"
   },
   "dependencies": {
+    "archiver": "^8.0.0",
     "axios": "^1.13.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "sqlite3": "^5.1.7",
+    "unzipper": "^0.12.5",
     "vue": "^3.4.21",
     "vue-router": "^4.6.3"
   },
@@ -35,8 +37,8 @@
     "electron-builder": "^26.0.12",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
-    "wait-on": "^8.0.3",
-    "vue-tsc": "^2.0.6"
+    "vue-tsc": "^2.0.6",
+    "wait-on": "^8.0.3"
   },
   "main": "electron/main.cjs",
   "build": {

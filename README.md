@@ -126,9 +126,12 @@ Depois do sorteio:
 
 Em `/admin`, cadastre e organize categorias, itens de Imagem Oculta, itens de Conexão, palavras e tabuleiros BUG, além de ajustar o placar. As categorias marcadas para cada jogo determinam o conjunto de itens disponível na rodada.
 
-O menu lateral possui as opções `Backup`, que baixa o banco SQLite atual, e
-`Restaurar`, que permite selecionar um arquivo `.sqlite` ou `.db`. A restauração
-substitui os dados atuais após confirmação e valida o arquivo antes da troca.
+O menu lateral possui as opções `Backup`, que baixa um ZIP contendo o banco
+SQLite atual e as imagens enviadas para Imagem Oculta e Conexão, e `Restaurar`,
+que aceita esse ZIP para recolocar banco e imagens nos locais corretos. A
+restauração substitui os dados atuais após confirmação e valida o conteúdo
+antes da troca. Backups antigos `.sqlite` ou `.db` continuam sendo aceitos,
+mas não contêm imagens.
 
 ### Configuração da botoeira
 

@@ -56,7 +56,7 @@
             <button type="button" class="nav-link backup-link" :disabled="isRestoring" @click="openRestorePicker">
               <i class="fas fa-upload"></i> {{ isRestoring ? 'Restaurando...' : 'Restaurar' }}
             </button>
-            <input ref="restoreInput" type="file" accept=".sqlite,.db" hidden @change="restoreDatabase" />
+            <input ref="restoreInput" type="file" accept=".zip,.sqlite,.db" hidden @change="restoreDatabase" />
           </li>
         </ul>
       </nav>
@@ -102,7 +102,7 @@ export default defineComponent({
       const input = event.target as HTMLInputElement;
       const file = input.files?.[0];
       if (!file) return;
-      if (!window.confirm('Restaurar este banco substituirá os dados atuais. Deseja continuar?')) {
+      if (!window.confirm('Restaurar este backup substituirá os dados atuais e as imagens cadastradas. Deseja continuar?')) {
         input.value = '';
         return;
       }

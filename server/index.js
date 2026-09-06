@@ -3,7 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const multer = require('multer');
+const { ZipArchive } = require('archiver');
+const unzipper = require('unzipper');
 const { initializeDatabase, getDb, getDbPath, restoreDatabase, runAsync, allAsync, getAsync } = require('./database');
 
 const categoryRoutes = require('./routes/categoryRoutes');
@@ -17,7 +20,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const restoreUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 200 * 1024 * 1024 },
+    limits: { fileSize: 500 * 1024 * 1024 },
 });
 
 app.use(cors());
@@ -28,6 +31,86 @@ const projectRoot = path.join(__dirname, '..'); // Caminho para a raiz do projet
 const dataPath = process.env.GAME_DATA_PATH || projectRoot;
 const publicPath = path.join(dataPath, 'public'); // Uploads: graváveis também no Electron empacotado
 const frontendBuildPath = process.env.FRONTEND_BUILD_PATH || path.join(projectRoot, 'dist');
+
+const backupManifest = {
+    format: 'carrocao-games-backup',
+    version: 1,
+    includesImages: true,
+    folders: ['public/characters', 'public/conexao_images'],
+};
+
+const isZipBuffer = (buffer) => buffer.subarray(0, 2).toString('ascii') === 'PK';
+
+const isSafeBackupEntry = (entryPath) => {
+    const normalized = path.posix.normalize(String(entryPath).replaceAll('\\', '/'));
+    return normalized === entryPath.replaceAll('\\', '/') &&
+        !normalized.startsWith('/') &&
+        normalized !== '..' &&
+        !normalized.startsWith('../') &&
+        !normalized.includes('/../');
+};
+
+const backupEntryTarget = (entryPath) => {
+    if (entryPath === 'game.db' || entryPath === 'manifest.json') return entryPath;
+    if (entryPath.startsWith('public/characters/') || entryPath.startsWith('public/conexao_images/')) return entryPath;
+    return null;
+};
+
+async function restoreZipBackup(buffer) {
+    const archive = await unzipper.Open.buffer(buffer);
+    const stagingPath = fs.mkdtempSync(path.join(os.tmpdir(), 'carrocao-restore-'));
+    let manifest = null;
+    let databaseBuffer = null;
+
+    try {
+        for (const entry of archive.files) {
+            const entryPath = entry.path.replaceAll('\\', '/');
+            if (!isSafeBackupEntry(entryPath)) {
+                throw new Error('O backup contém um caminho de arquivo inválido.');
+            }
+
+            // Diretórios são apenas estrutura do ZIP e não precisam ser gravados.
+            if (entry.type === 'Directory') continue;
+            if (entry.type !== 'File') {
+                throw new Error('O backup contém um tipo de arquivo não suportado.');
+            }
+
+            const target = backupEntryTarget(entryPath);
+            if (!target) {
+                throw new Error(`O backup contém um arquivo não permitido: ${entryPath}`);
+            }
+
+            const targetPath = path.join(stagingPath, target);
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            const fileBuffer = await entry.buffer();
+            fs.writeFileSync(targetPath, fileBuffer);
+
+            if (target === 'manifest.json') manifest = JSON.parse(fileBuffer.toString('utf8'));
+            if (target === 'game.db') databaseBuffer = fileBuffer;
+        }
+
+        if (!databaseBuffer || !manifest || manifest.format !== backupManifest.format || manifest.version !== backupManifest.version) {
+            throw new Error('O arquivo ZIP não é um backup válido do Carroção Games.');
+        }
+
+        await restoreDatabase(databaseBuffer);
+
+        if (manifest.includesImages) {
+            const imageFolders = [
+                ['public/characters', charactersUploadPath],
+                ['public/conexao_images', conexaoImagesUploadPath],
+            ];
+            for (const [relativeFolder, destinationFolder] of imageFolders) {
+                fs.rmSync(destinationFolder, { recursive: true, force: true });
+                fs.mkdirSync(destinationFolder, { recursive: true });
+                const sourceFolder = path.join(stagingPath, relativeFolder);
+                if (fs.existsSync(sourceFolder)) fs.cpSync(sourceFolder, destinationFolder, { recursive: true });
+            }
+        }
+    } finally {
+        fs.rmSync(stagingPath, { recursive: true, force: true });
+    }
+}
 
 
 // Garante que as pastas de upload existam
@@ -67,7 +150,7 @@ app.get('/api/status', (req, res) => {
     res.send('Servidor Imagem Oculta API está online!');
 });
 
-// Download do banco para backup pelo painel administrativo.
+// Download do banco e das imagens para backup pelo painel administrativo.
 app.get('/api/admin/backup', (req, res) => {
     const databasePath = getDbPath();
     if (!fs.existsSync(databasePath)) {
@@ -75,12 +158,12 @@ app.get('/api/admin/backup', (req, res) => {
     }
 
     const date = new Date().toISOString().slice(0, 10);
-    const filename = `carrocao-games-backup-${date}.sqlite`;
-    res.setHeader('Content-Type', 'application/vnd.sqlite3');
+    const filename = `carrocao-games-backup-${date}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    const stream = fs.createReadStream(databasePath);
-    stream.on('error', (error) => {
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    archive.on('error', (error) => {
         console.error('[Backup] Erro ao ler banco de dados:', error);
         if (!res.headersSent) {
             res.status(500).json({ error: 'Não foi possível gerar o backup.' });
@@ -88,23 +171,32 @@ app.get('/api/admin/backup', (req, res) => {
             res.destroy(error);
         }
     });
-    stream.pipe(res);
+    archive.pipe(res);
+    archive.append(JSON.stringify(backupManifest, null, 2), { name: 'manifest.json' });
+    archive.file(databasePath, { name: 'game.db' });
+    if (fs.existsSync(charactersUploadPath)) archive.directory(charactersUploadPath, 'public/characters');
+    if (fs.existsSync(conexaoImagesUploadPath)) archive.directory(conexaoImagesUploadPath, 'public/conexao_images');
+    archive.finalize();
 });
 
 app.post('/api/admin/restore', restoreUpload.single('database'), async (req, res) => {
     if (!req.file) {
-        return res.status(400).json({ error: 'Selecione um arquivo SQLite para restaurar.' });
-    }
-    if (req.file.buffer.subarray(0, 16).toString() !== 'SQLite format 3\0') {
-        return res.status(400).json({ error: 'O arquivo selecionado não é um banco SQLite válido.' });
+        return res.status(400).json({ error: 'Selecione um backup ZIP ou um arquivo SQLite para restaurar.' });
     }
 
     try {
-        await restoreDatabase(req.file.buffer);
-        res.json({ message: 'Banco de dados restaurado com sucesso.' });
+        if (isZipBuffer(req.file.buffer)) {
+            await restoreZipBackup(req.file.buffer);
+            res.json({ message: 'Banco e imagens restaurados com sucesso.' });
+        } else if (req.file.buffer.subarray(0, 16).toString() === 'SQLite format 3\0') {
+            await restoreDatabase(req.file.buffer);
+            res.json({ message: 'Banco de dados restaurado com sucesso. As imagens não fazem parte deste backup antigo.' });
+        } else {
+            return res.status(400).json({ error: 'O arquivo selecionado não é um backup ZIP ou banco SQLite válido.' });
+        }
     } catch (error) {
         console.error('[Backup] Erro ao restaurar banco de dados:', error);
-        res.status(400).json({ error: 'Não foi possível restaurar o banco de dados.' });
+        res.status(400).json({ error: error.message || 'Não foi possível restaurar o backup.' });
     }
 });
 

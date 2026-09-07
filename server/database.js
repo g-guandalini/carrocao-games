@@ -608,12 +608,8 @@ async function seedInitialData() {
  */
 async function initializeDatabase() {
     try {
-        // Criar a pasta 'db' se não existir
-        const dbDir = path.join(__dirname, 'db');
-        if (!fs.existsSync(dbDir)) {
-            fs.mkdirSync(dbDir);
-        }
-
+        // O diretório pai de DB_PATH já é criado acima. Não use __dirname
+        // aqui: no Electron empacotado ele aponta para app.asar, que é somente leitura.
         await connectDb();
         await createTables(); // Garante que as tabelas e colunas estão prontas
         await seedInitialData(); // Popula os dados
